@@ -1,2 +1,3 @@
-# Cell_IA.jl
-In this repository you can find a framework that will allow you to support cellular automata in Julia.
+# Cell_IA
+
+[![Build Status](https://github.com/celhe/Cell_IA.jl/actions/workflows/CI.yml/badge.svg?branch=master)](https://github.com/celhe/Cell_IA.jl/actions/workflows/CI.yml?query=branch%3Amaster)
