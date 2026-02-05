@@ -30,5 +30,5 @@ game_of_life = initialize(
 println(typeof(game_of_life))
 
 #                   model/fle_name/sim_title/agent_shape/agent_size/sim_framerate/sim_frames
-video_simulation(game_of_life, "gol.mp4", "Game of Life", :rect, 13, 9, 50)
+video_simulation(game_of_life, "gol.mp4", "Game of Life", :rect, 13, 9, 50, :red, :blue)
 
