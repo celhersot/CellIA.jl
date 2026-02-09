@@ -5,7 +5,8 @@ export UniversalAgent
 # Un agente que sirve para casi todo (Grid y Continuo)
 @agent struct UniversalAgent(GridAgent{2})
     # status podría ser un Bool (GoL), un Float (Lenia) o un Symbol (Piedra papel tijeras)
-    state::Union{Bool, Float64, Symbol, Int} 
+    state::Union{Bool, Float64, Symbol, Int}
+    future_state::Union{Bool, Float64, Symbol, Int} # For synchronous simulations
     group::Int # Para diferenciar tipos (ej. lobo vs oveja)
 end
 

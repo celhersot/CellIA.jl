@@ -1,0 +1,36 @@
+[simulation]
+model_name = "GameOfLife"
+seed = 125
+steps = 100                                      # Horizonte temporal (opcional)
+
+[space]
+type = "grid"                                    # Opciones: grid, continuous, graph
+dimensions = [50, 50]
+periodic = true
+metric = "chebyshev"                             # Para espacios continuos o grid complejos
+
+[agents]
+type = "GridAgent"                               # Definirá qué struct usar
+total_count = 0                                  # Si es 0, se usa la densidad
+density = 0.3                                    # Porcentaje de ocupación inicial
+scheduler = "random"                             # random, by_id, fastest...
+
+[rules]
+agent_step = "gol_step_syn!" 
+model_step = "gol_model_step!"
+initialization_rule = "sorted_placement_h"         # Optiones: random_placement, sorted_placement_h, sorted_placement_v
+
+[properties]
+# AQUÍ van los parámetros específicos del modelo (GoL, Lenia, Predador, etc)
+min_to_live = 2
+max_to_live = 3
+
+[visualization]
+filename = "simulation_syn_sorted_h.mp4"
+title = "GoL"
+agent_shape = "rect"
+agent_size = 13
+framerate = 10
+frames = 50
+color_scheme = { dead = "white", alive = "black" } # Mapa de colores
+variable_to_color = "state"                     # Qué variable del agente define el color
