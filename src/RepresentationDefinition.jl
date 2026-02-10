@@ -3,19 +3,18 @@ using CairoMakie, Agents
 export video_simulation
 
 function video_simulation(model, viz_config)
-    # Extraer configuración
-    color_map = viz_config["color_scheme"] # Dict("alive" => "green", "dead" => "yellow")
-    var_name = viz_config["variable_to_color"] # "state"
-    
-    # Función de color dinámica
+    # Extract configuration
+    color_map = viz_config["color_scheme"]
+    var_name = viz_config["variable_to_color"]
+
     function get_color(agent)
-        # Obtenemos el valor del estado del agente (ej. true/false o 1/0)
+        # Getting the state value of an agent
         val = getfield(agent, Symbol(var_name)) 
-        # Mapeamos ese valor al color definido en el TOML
-        # Nota: requiere adaptar el TOML para que las claves coincidan con los valores del estado
-        return val == true ? color_map["alive"] : color_map["dead"]
+        # Mapping the color
+        return val == true ? color_map["alive"] : color_map["dead"] # In the future, make it customizable.
     end
 
+    # Create the simulation and export the video
     abmvideo(
         viz_config["filename"], model;
         agent_color = get_color,

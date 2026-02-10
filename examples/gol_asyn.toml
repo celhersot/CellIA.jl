@@ -1,26 +1,25 @@
 [simulation]
 model_name = "GameOfLife"
 seed = 125
-steps = 100                                      # Horizonte temporal (opcional)
+steps = 100
 
 [space]
-type = "grid"                                    # Opciones: grid, continuous, graph
+type = "grid"                                    # Options: grid, continuous, graph
 dimensions = [50, 50]
 periodic = true
-metric = "chebyshev"                             # Para espacios continuos o grid complejos
+metric = "chebyshev"                             # Options: chebyshev, manhattan, euclidean
 
 [agents]
-type = "GridAgent"                               # Definirá qué struct usar
-total_count = 0                                  # Si es 0, se usa la densidad
-density = 0.3                                    # Porcentaje de ocupación inicial
-scheduler = "random"                             # random, by_id, fastest...
+type = "GridAgent"                               # The agent structure by default
+total_count = 0                                  # If 0, the density will be used
+density = 0.3                                    # Initial ocupation percent
+scheduler = "random"                             # Random, by_id, fastest...
 
 [rules]
-evolution_rule = "gol_step_asyn!"                     # EL NOMBRE DE LA FUNCIÓN en Julia
-initialization_rule = "random_placement"
+evolution_rule = "gol_step_asyn!"
+initialization_rule = "random_placement"         # Options: random_placement, sorted_placement_h, sorted_placement_v
 
 [properties]
-# AQUÍ van los parámetros específicos del modelo (GoL, Lenia, Predador, etc)
 min_to_live = 2
 max_to_live = 3
 
@@ -31,5 +30,5 @@ agent_shape = "rect"
 agent_size = 13
 framerate = 10
 frames = 50
-color_scheme = { dead = "yellow", alive = "green" } # Mapa de colores
-variable_to_color = "state"                     # Qué variable del agente define el color
+color_scheme = { dead = "yellow", alive = "green" } # Color map
+variable_to_color = "state"

@@ -1,11 +1,13 @@
 module AgentDefinition
 
-export GoLAgent
-
 using Agents
 
-@agent struct GoLAgent(GridAgent{2})
-    status::Bool # true = vivo, false = muerto
+export UniversalAgent
+
+@agent struct UniversalAgent(GridAgent{2})
+    state::Union{Bool, Float64, Symbol, Int}
+    future_state::Union{Bool, Float64, Symbol, Int} # For synchronous simulations
+    group::Int
 end
 
 end

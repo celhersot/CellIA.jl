@@ -2,37 +2,30 @@ module InitializationDefinition
 
 export initialize_model
 
-include("../prueba/AgentDefinition.jl")
-include("../prueba/EvolutionRulesDefinition.jl")
+include("../src/AgentDefinition.jl")
+include("../src/EvolutionRulesDefinition.jl")
 
 using Agents
 using Random
-using .AgentDefinition # Asumiendo que usas '..' para subir un nivel
+using .AgentDefinition
 using .EvolutionRulesDefinition
 
 function initialize_model(config::Dict)
-    # 1. Definir el Espacio
+    # Space definition (Discrete or Continuous)
     space_config = config["space"]
     space = nothing
     
     if space_config["type"] == "grid"
         dims = Tuple(space_config["dimensions"])
-        # GridSpaceSingle es más rápido si solo hay 1 agente por celda
         space = GridSpaceSingle(dims; periodic = space_config["periodic"])
     elseif space_config["type"] == "continuous"
-        # Lógica para ContinuousSpace...
         space = ContinuousSpace(Tuple(space_config["dimensions"]))
     end
 
-    # 2. Definir Propiedades del Modelo (Globales)
-    # Convertimos las keys de String a Symbol para Agents.jl
+    # Global properties definition
     properties = Dict(Symbol(k) => v for (k, v) in config["properties"])
 
-    # 3. Obtener la Regla de Evolución dinámicamente
-    #rule_name = config["rules"]["evolution_rule"]
-    # MAGIA: Buscamos la función dentro del módulo EvolutionRules usando su nombre
-    #step_function = getfield(EvolutionRulesDefinition, Symbol(rule_name))
-
+    # Getting the evolution rules
     rules_config = config["rules"]
     agent_step_fn = dummystep
     model_step_fn = dummystep
@@ -49,10 +42,10 @@ function initialize_model(config::Dict)
         fn_name = rules_config["evolution_rule"]
         agent_step_fn = getfield(EvolutionRulesDefinition, Symbol(fn_name))
     end
-    # 4. Construir el Modelo
+
+    # Model definition
     rng = Xoshiro(config["simulation"]["seed"])
     
-    # Aquí asumimos UniversalAgent por simplicidad, pero podrías elegir el struct también
     model = StandardABM(
         UniversalAgent, 
         space;
@@ -63,7 +56,7 @@ function initialize_model(config::Dict)
         scheduler = Schedulers.Randomly()
     )
 
-    # 5. Inicializar Agentes (Poblar el mundo)
+    # Populate the world
     populate_world!(model, config)
 
     return model

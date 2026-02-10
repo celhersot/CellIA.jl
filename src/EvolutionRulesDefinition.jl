@@ -1,9 +1,12 @@
 module EvolutionRulesDefinition
 
 using Agents
+
 export gol_step_asyn!, gol_step_syn!, gol_model_step!, lenia_step!, predator_prey_step!
 
-# ---GAME OF LIFE ---
+# --- GAME OF LIFE ---
+
+# Asynchronous agents update for GoL
 function gol_step_asyn!(agent, model)
     n_alive = count(n -> n.state == true, nearby_agents(agent, model))
     
@@ -18,6 +21,7 @@ function gol_step_asyn!(agent, model)
     end
 end
 
+# Synchronous agents update for GoL
 function gol_step_syn!(agent, model)
     n_alive = count(n -> n.state == true, nearby_agents(agent, model))
     
@@ -36,16 +40,17 @@ function gol_step_syn!(agent, model)
     end
 end
 
+# Auxiliar function to execute syn simulation of GoL
 function gol_model_step!(model)
     for agent in allagents(model)
         agent.state = agent.future_state
     end
 end
 
-# ------
+# --- PREDATOR - PREY ---
 
 function predator_prey_step!(agent, model)
-    # Lógica de depredador presa...
+    # To implement.
 end
 
 end
