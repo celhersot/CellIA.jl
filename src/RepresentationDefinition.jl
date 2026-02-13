@@ -3,26 +3,28 @@ using CairoMakie, Agents
 export video_simulation
 
 function video_simulation(model, viz_config)
-    # Extract configuration
     color_map = viz_config["color_scheme"]
     var_name = viz_config["variable_to_color"]
 
     function get_color(agent)
-        # Getting the state value of an agent
         val = getfield(agent, Symbol(var_name)) 
-        # Mapping the color
-        return val == true ? color_map["alive"] : color_map["dead"] # In the future, make it customizable.
+        if val isa Bool
+            key = val ? "alive" : "dead"
+        else
+            key = string(val)
+        end
+
+        return get(color_map, key, "gray")
     end
 
-    # Create the simulation and export the video
     abmvideo(
         viz_config["filename"], model;
         agent_color = get_color,
-        agent_marker = Symbol(viz_config["agent_shape"]),
-        agent_size = viz_config["agent_size"],
-        framerate = viz_config["framerate"],
-        frames = viz_config["frames"],
-        title = viz_config["title"]
+        agent_marker = Symbol(get(viz_config, "agent_shape", "rect")),
+        agent_size = get(viz_config, "agent_size", 10),
+        framerate = get(viz_config, "framerate", 10),
+        frames = get(viz_config, "frames", 100),
+        title = get(viz_config, "title", "ABM Simulation")
     )
 end
 end

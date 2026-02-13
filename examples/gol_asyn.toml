@@ -10,6 +10,7 @@ periodic = true
 metric = "chebyshev"                             # Options: chebyshev, manhattan, euclidean
 
 [agents]
+n_states = 1
 type = "GridAgent"                               # The agent structure by default
 total_count = 0                                  # If 0, the density will be used
 density = 0.3                                    # Initial ocupation percent

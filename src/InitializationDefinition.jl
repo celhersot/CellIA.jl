@@ -69,49 +69,54 @@ function populate_world!(model, config)
 
     rules_cfg = config["rules"]
     agent_cfg = config["agents"]
+
+    n_states = get(agent_cfg, "n_states", 1) 
     init_strategy = get(rules_cfg, "initialization_rule", "random_placement")
     
     dims = size(abmspace(model))
     total_slots = prod(dims)
     
-    total_agents_to_live = haskey(agent_cfg, "total_count") && agent_cfg["total_count"] > 0 ? 
-                           agent_cfg["total_count"] : 
-                           floor(Int, total_slots * agent_cfg["density"])
+    total_to_live = haskey(agent_cfg, "total_count") && agent_cfg["total_count"] > 0 ? 
+                    agent_cfg["total_count"] : 
+                    floor(Int, total_slots * agent_cfg["density"])
 
     if init_strategy == "random_placement"
         all_ids = collect(allids(model))
         shuffle!(abmrng(model), all_ids)
-        for i in 1:total_agents_to_live
+        for i in 1:total_to_live
             target_id = all_ids[i]
-            model[target_id].state = true
-            model[target_id].future_state = true
+            val = n_states > 1 ? (i % n_states) + 1 : true
+            model[target_id].state = val
+            model[target_id].future_state = val
         end
 
     elseif init_strategy == "sorted_placement_h"
         mid_y = div(dims[2], 2)
         center_x = div(dims[1], 2)
-        half_len = div(total_agents_to_live, 2)
+        half_len = div(total_to_live, 2)
         
-        for i in 1:total_agents_to_live
+        for i in 1:total_to_live
             x = clamp(center_x - half_len + i, 1, dims[1])
             id = id_in_position((x, mid_y), model)
             if id != 0
-                model[id].state = true
-                model[id].future_state = true
+                val = n_states > 1 ? (i % n_states) + 1 : true
+                model[id].state = val
+                model[id].future_state = val
             end
         end
 
     elseif init_strategy == "sorted_placement_v"
         mid_x = div(dims[1], 2)
         center_y = div(dims[2], 2)
-        half_len = div(total_agents_to_live, 2)
+        half_len = div(total_to_live, 2)
 
-        for i in 1:total_agents_to_live
+        for i in 1:total_to_live
             y = clamp(center_y - half_len + i, 1, dims[2])
             id = id_in_position((mid_x, y), model)
             if id != 0
-                model[id].state = true
-                model[id].future_state = true
+                val = n_states > 1 ? (i % n_states) + 1 : true
+                model[id].state = val
+                model[id].future_state = val
             end
         end
     end

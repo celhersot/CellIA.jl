@@ -2,8 +2,10 @@ module EvolutionRulesDefinition
 
 using Agents
 
-export gol_step_asyn!, gol_step_syn!, gol_model_step!, lenia_step!, predator_prey_step!
+export gol_step_asyn!, gol_step_syn!, gol_model_step!, lenia_step!, predator_prey_step!, rps_step_syn!
 
+function hola()
+end
 # --- GAME OF LIFE ---
 
 # Asynchronous agents update for GoL
@@ -51,6 +53,19 @@ end
 
 function predator_prey_step!(agent, model)
     # To implement.
+end
+
+# --- ROCK, PAPER, SCISSORS ---
+
+function rps_step_syn!(agent, model)
+    beaten_by = (agent.state % 3) + 1
+    n_predators = count(n -> n.state == beaten_by, nearby_agents(agent, model))
+    
+    if n_predators >= model.threshold
+        agent.future_state = beaten_by
+    else
+        agent.future_state = agent.state
+    end
 end
 
 end

@@ -10,6 +10,7 @@ periodic = true
 metric = "chebyshev"                             # Options: chebyshev, manhattan, euclidean
 
 [agents]
+n_state = 1
 type = "GridAgent"                               # The agent structure by default
 total_count = 0                                  # If 0, the density will be used
 density = 0.3                                    # Initial ocupation percent
@@ -18,7 +19,7 @@ scheduler = "random"                             # Random, by_id, fastest...
 [rules]
 agent_step = "gol_step_syn!" 
 model_step = "gol_model_step!"
-initialization_rule = "sorted_placement_h"      # Options: random_placement, sorted_placement_h, sorted_placement_v
+initialization_rule = "random_placement"      # Options: random_placement, sorted_placement_h, sorted_placement_v
 
 [properties]
 min_to_live = 2
