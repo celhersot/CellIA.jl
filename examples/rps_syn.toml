@@ -1,0 +1,33 @@
+[simulation]
+model_name = "RockPaperScissors"
+seed = 42
+steps = 200
+
+[space]
+type = "grid"
+dimensions = [50, 50]
+periodic = true
+metric = "chebyshev"
+
+[agents]
+n_states = 3
+type = "GridAgent"
+density = 1.0
+
+[rules]
+agent_step = "rps_step_syn!" 
+model_step = "gol_model_step!"
+initialization_rule = "random_placement"
+
+[properties]
+threshold = 3
+
+[visualization]
+filename = "rps_simulation.mp4"
+title = "Rock Paper Scissors"
+agent_shape = "rect"
+agent_size = 13
+framerate = 15
+frames = 50
+color_scheme = { 1 = "red", 2 = "green", 3 = "blue" } 
+variable_to_color = "state"
