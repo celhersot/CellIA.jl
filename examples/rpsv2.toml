@@ -1,0 +1,28 @@
+[simulation]
+model_name = "RockPaperScissors"
+seed = 42
+
+[space]
+type = "grid"
+dimensions = [50, 50]
+periodic = true
+
+[properties]
+threshold = 3
+
+[agents.population]
+pop_density = { 1 = 0.33, 2 = 0.33, 3 = 0.34 }
+
+[rules]
+agent_step = "rps_step!"
+model_step = "default_model_step!"
+initialization_rule = "random"
+
+[visualization]
+filename = "output_videos/rps.mp4"
+title = "Spatial Rock-Paper-Scissors"
+variable_to_color = "state"
+color_scheme = { 1 = "red", 2 = "blue", 3 = "green" }
+agent_shape = "rect"
+framerate = 15
+frames = 150

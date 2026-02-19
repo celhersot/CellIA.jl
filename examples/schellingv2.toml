@@ -1,0 +1,28 @@
+[simulation]
+model_name = "SchellingSegregation"
+seed = 42
+
+[space]
+type = "grid"
+dimensions = [50, 50]
+periodic = false
+
+[properties]
+min_identical = 0.3
+
+[agents.population]
+pop_density = { 1 = 0.4, 2 = 0.4, 0 = 0.2 }
+
+[rules]
+agent_step = "schelling_step!"
+model_step = "default_model_step!"
+initialization_rule = "random"
+
+[visualization]
+filename = "output_videos/schelling.mp4"
+title = "Schelling Segregation Model"
+variable_to_color = "state"
+color_scheme = { 0 = "white", 1 = "#E63946", 2 = "#1D3557" }
+agent_shape = "rect"
+framerate = 5
+frames = 60

@@ -1,0 +1,34 @@
+[simulation]
+model_name = "LeniaContinuous"
+seed = 42
+
+[space]
+type = "grid"
+dimensions = [100, 100]
+periodic = true
+
+[properties]
+# Parámetros biológicos
+lenia_mu = 0.15      # Media de la campana (población ideal)
+lenia_sigma = 0.015  # Desviación (tolerancia)
+dt = 0.1             # Paso de tiempo (velocidad de evolución)
+
+[agents.population]
+# Inicializamos con ruido aleatorio para que emerjan formas
+pop_density = { "random_float" = 1.0 }
+
+[rules]
+agent_step = "lenia_step!"
+model_step = "default_model_step!"
+initialization_rule = "random"
+
+[visualization]
+filename = "output_videos/lenia.mp4"
+title = "Lenia Continuous CA"
+variable_to_color = "state"
+# Para Lenia, usamos un gradiente. Tu Representation.jl debería
+# detectar que si el estado es Float, usa un mapa de colores (colormap)
+color_scheme = "viridis" 
+agent_shape = "rect"
+framerate = 20
+frames = 200

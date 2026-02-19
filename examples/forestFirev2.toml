@@ -1,0 +1,44 @@
+[simulation]
+model_name = "ForestFire"
+seed = 42
+
+[space]
+type = "grid"
+dimensions = [50, 50]
+periodic = false
+metric = "chebyshev"
+
+[agents]
+metadata = { energy = 10, type_label = "organism" }
+
+[agents.population]
+# OPCIÓN A: Density
+pop_density = { tree = 0.6, fire = 0.02 }
+
+# OPCIÓN B: Quantity
+# pop_quantity = { tree = 200, fire = 5 }
+
+[rules]
+# Function's names in rules.jl
+agent_step = "forest_step!"
+model_step = "forest_model_step!"
+initialization_rule = "random" # random, center_filled, horizontal_line
+
+[visualization]
+filename = "output_videos/forest_fire.mp4"
+title = "Forest Fire Model"
+agent_size = 15
+framerate = 8
+frames = 60
+
+# variable_to_color busca en campos del struct Y en metadata
+variable_to_color = "state" 
+
+# OPCIÓN 1: Diccionario Manual
+color_scheme = { tree = "green", fire = "red", empty = "white", ash = "gray" }
+
+# OPCIÓN 2: Lista (si estados fuesen números 1, 2, 3)
+# color_scheme = ["green", "red", "gray"]
+
+# OPCIÓN Formas: Puede ser string único "rect" o dict
+agent_shape = { tree = "circle", fire = "diamond", ash = "rect" }
