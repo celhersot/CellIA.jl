@@ -11,18 +11,19 @@ function video_simulation(model, viz_config)
 
     function resolve_color(agent)
         # 1. Obtener valor actual
-        raw_val = hasfield(typeof(agent), Symbol(var_name)) ? getfield(agent, Symbol(var_name)) : agent.metadata[var_name]
-        
-        # --- CASO ESPECIAL: LENIA / CONTINUO (Float) ---
-        # Si el valor es un número decimal (como en Lenia), usamos el gradiente
-        val_float = tryparse(Float64, string(raw_val))
-        
-        if !isnothing(val_float) && (raw_val isa AbstractFloat || color_scheme_in == "viridis")
-            # Gradiente de Azul (bajo) a Amarillo (alto)
-            r = Int(floor(255 * val_float))
-            g = Int(floor(255 * val_float))
-            b = Int(floor(255 * (1.0 - val_float)))
-            return "rgb($r, $g, $b)"
+        raw_val = agent
+        try
+            for part in split(string(var_name), ".")
+                field = Symbol(part)
+                # Intentamos obtenerlo como campo (struct) o como propiedad (Agents.jl)
+                if hasfield(typeof(raw_val), field)
+                    raw_val = getfield(raw_val, field)
+                else
+                    raw_val = getproperty(raw_val, field)
+                end
+            end
+        catch e
+            raw_val = agent.state
         end
 
         # --- CASO DISCRETO: (Estados como "1", "rock", :alive) ---

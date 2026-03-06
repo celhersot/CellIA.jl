@@ -1,7 +1,7 @@
 using Agents
 using Random
 
-# Función paso de agente (ejemplo Forest Fire)
+# eL FOREST FIRE
 function forest_step!(agent, model)
     if agent.state == "tree"
         # Regla: Si hay un vecino "fire", me quemo
@@ -20,9 +20,7 @@ function forest_step!(agent, model)
     end
 end
 
-# Función model_step (si fuera síncrona o necesitara update global)
 function forest_model_step!(model)
-    # Aplicar cambios de estado síncronos
     for agent in allagents(model)
         agent.state = agent.future_state
     end
