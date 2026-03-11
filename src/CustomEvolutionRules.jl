@@ -3,13 +3,7 @@ using Agents
 using Random
 
 # --- DEFAULT MODEL STEP ---
-"""
-function default_model_step!(model)
-    for agent in allagents(model)
-        agent.state = agent.future_state
-    end
-end
-"""
+
 function default_model_step!(model)
     for agent in allagents(model)
         if haskey(model.next_states, agent.id)
@@ -20,21 +14,7 @@ function default_model_step!(model)
 end
 
 # --- GAME OF LIFE ---
-"""
-function gol_step!(agent, model)
-    alives = 0
-    for neighbor in nearby_agents(agent, model)
-        if neighbor.state == true
-            alives += 1
-        end
-    end
-    if agent.state == true
-        agent.future_state = (alives == model.min_to_live || alives == model.max_to_live) ? true : false
-    else
-        agent.future_state = (alives == model.max_to_live) ? true : false
-    end
-end
-"""
+
 function gol_step!(agent, model)
     alives = count(n -> n.state == true, nearby_agents(agent, model))
     
@@ -63,45 +43,19 @@ end
 ### --- SCHELLING'S SEGREGATION MODEL ---
 
 function schelling_step!(agent, model)
-    curr_state = string(agent.state)
+    neighbors = collect(nearby_agents(agent, model))
     
-    if curr_state == "0" || curr_state == "empty"
-        if string(agent.future_state) == curr_state
-            agent.future_state = agent.state 
-        end
+    # If alone -> happy
+    if isempty(neighbors)
         return
     end
 
-    count_neighbors = 0
-    count_identical = 0
+    same_group_count = count(n -> n.state == agent.state, neighbors)
+    ratio = same_group_count / length(neighbors)
     
-    for neighbor in nearby_agents(agent, model)
-        n_state = string(neighbor.state)
-        if n_state != "0" && n_state != "empty"
-            count_neighbors += 1
-            if n_state == curr_state
-                count_identical += 1
-            end
-        end
-    end
-
-    if count_neighbors > 0 && (count_identical / count_neighbors) < model.min_identical
-        empty_cells = filter(
-            a -> (string(a.state) == "0" || string(a.state) == "empty") && 
-                 a.future_state == a.state, 
-            collect(allagents(model))
-        )
-        
-        if !isempty(empty_cells)
-            target_cell = rand(abmrng(model), empty_cells)
-            
-            agent.future_state = target_cell.state 
-            target_cell.future_state = agent.state
-        else
-            agent.future_state = agent.state
-        end
-    else
-        agent.future_state = agent.state
+    # It moves
+    if ratio < model.min_identical
+        move_agent_single!(agent, model)
     end
 end
 
