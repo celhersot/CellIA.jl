@@ -1,169 +1,167 @@
 module LLMBuilder
-using PromptingTools
+using LlamaCpp
+using Downloads
+using TOML
+
 export build_from_prompt
 
-# The brain of the LLM
-const SYSTEM_PROMPT = """
-You are an expert Julia developer specializing in Cellular Automata and Agent-Based Models (ABM). 
-Your objective is to translate the user's natural language description of a simulation into a valid TOML configuration file for our custom framework. 
+const MODEL_DIR = joinpath(@__DIR__, "..", "models")
+const MODEL_NAME = "qwen2.5-1.5b-coder-q4_k_m.gguf"
+const MODEL_PATH = joinpath(MODEL_DIR, MODEL_NAME)
+const MODEL_URL = "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
+#const SYSTEM_PROMPT_PATH = joinpath(@__DIR__, "system_prompt.txt")
+const SYSTEM_PROMPT_PATH = joinpath(@__DIR__, "dummy_prompt.txt")
+const SYSTEM_PROMPT = read(SYSTEM_PROMPT_PATH, String)
 
-DECISION LOGIC:
-1. If the requested simulation matches one of the predefined rules (Game of Life, Rock-Paper-Scissors, Schelling), you must output ONLY the TOML file.
-2. If the requested simulation involves custom rules not covered by the predefined ones, you must output the TOML file AND a Julia (.jl) file containing the custom rule definitions.
-3. NEVER output conversational text, explanations, or greetings. Output ONLY the markdown code blocks (```toml and optionally ```julia).
+function ensure_model_exists()
+    if !isdir(MODEL_DIR)
+        println("--> Using downloaded model")
+        mkpath(MODEL_DIR)
+    end
 
---- TOML SPECIFICATIONS ---
-The TOML file must strictly follow this structure and rules:
-
-[simulation]
-- model_name: String. Generate a fitting name if not provided.
-- seed: Integer. Default is 125 if not provided.
-
-[space]
-- type: String. Allowed values: "grid", "continuous", "hexagonal".
-- dimensions: Array of two integers. Default is [50, 50]. If a single size is implied, make it square (e.g., [200, 200]).
-- periodic: Boolean. Default is true, unless the simulation logic dictates boundaries.
-- metric: String. Allowed values: "chebyshev", "manhattan", "euclidean". Default is "chebyshev".
-
-[properties]
-- Include any global parameters, thresholds, or constants required by the simulation. Omit this section if none are needed.
-- The properties will be usually used by the evolution rules, so take it into account.
-
-[agents]
-- state_type: It can be Int, Float64, Symbol, Bool or custom type such as "TreeState". If the user has not specified the agent type, use the one that best suits the problem.
-
-[population]
-- Use EITHER `pop_density` (percentages summing to 1.0) OR `pop_quantity` (exact integer counts), but NEVER both.
-- Use dictionaries mapping states to values. Example: pop_density = { alive = 0.2, dead = 0.8 }. 
-- Generate reasonable initial populations if the user omits them according to the problem.
-
-[rules]
-- agent_step: The name of the step function. Use predefined rules if applicable: "gol_step!", "rps_step!", or "schelling_step!". If custom, invent a descriptive name (e.g., "forest_step!").
-- model_step: The synchronous update function. Default is "default_model_step!". Only change this if the custom simulation explicitly requires custom global updates.
-- initialization_rule: String. Allowed values: "random", "center_filled", "horizontal_line", "vertical_line". Default is "random".
-
-[visualization]
-- filename: String. Always save in "videos/" with an ".mp4" extension (e.g., "output_videos/model.mp4").
-- title: String. Generate a descriptive title.
-- variable_to_color: String. Usually "state", but can be an agent metadata attribute if requested such as "state.status", "state.age"...
-- color_scheme: Dictionary mapping states to CSS color strings (e.g., { alive = "black", dead = "white" }). Generate appropriate colors if not provided. Take into account the agent type to define this dictionary.
-- agent_shape: String. Allowed values: "rect", "circle", "triangle", "diamond". Default is "rect".
-- agent_size: Integer. Must be estimated inversely to the grid size. Rule of thumb: for 50x50 dimensions use 12; for 200x200 dimensions use 4.
-- framerate: Integer. Default is 10.
-- frames: Integer. Default is 50.
-
---- DEFAULT MODEL STEP, CHANGE ONLY IF NECESSARY ---
-function default_model_step!(model)
-    for agent in allagents(model)
-        if haskey(model.next_states, agent.id)
-            agent.state = model.next_states[agent.id]
+    if !isfile(MODEL_PATH)
+        println("--> 📦 First execution: Downloading brain...")
+        println("--> This will only happen once. Please wait...")
+        try
+            Downloads.download(MODEL_URL, MODEL_PATH)
+            println("--> Model downloaded successfully.")
+        catch e
+            error("Error downloading the template. Check your internet connection: $e")
         end
     end
-    empty!(model.next_states)
+    return MODEL_PATH
 end
 
---- JULIA CODE SPECIFICATIONS (IF CUSTOM RULES ARE NEEDED) ---
-If you must generate a Julia code block, write the functions considering the underlying framework. The agents are defined as:
-
-```julia
-@agent struct UniversalAgent{T}(GridAgent{2})
-    state::T
-end
-
-Example of generated rules_forest_fire.jl:
-
-using Agents
-using Random
-
-struct TreeState
-    status::Symbol  # :tree, :fire, :empty, :ash
-    energy::Int
-    age::Int
-end
-
-function TreeState(s::String)
-    parts = split(replace(s, r"TreeState(|)" => ""), ",") # It performs the necessary processing with the characters, simplified here as an example.
-    status = Symbol(strip(parts[1]))
-    energy = parse(Int, strip(parts[2]))
-    age = parse(Int, strip(parts[3]))
-    return TreeState(status, energy, age)
-end
-
-function forest_step!(agent, model)
-    current = agent.state
+function build_from_prompt(user_text::String; output_dir=joinpath(@__DIR__, "..", "examples2"))
+    model_path = ensure_model_exists()
+    mkpath(output_dir)
     
-    if current.status == :fire
-        model.next_states[agent.id] = TreeState(:ash, 0, current.age)
+    println("--> Local LLM is thinking (this might take a moment)...")
+    response_text = run_llama(model_path, user_text)
+    println("FINISH")
     
-    elseif current.status == :tree
-        fire_neighbors = count(n -> n.state.status == :fire, nearby_agents(agent, model))
+    
+    #clean_text = replace(response_text, r"\e\[[0-9;]*m" => "")
+    #clean_text = replace(clean_text, r".*available commands:.*?(\n> )?"s => "")
+    #clean_text = replace(clean_text, r"\[ Prompt: .*? \]" => "") # Quita las estadísticas finales
+
+    #pattern = r"FILENAME:\s*([a-zA-Z0-9_\.-]+)\s*```[a-zA-Z]*\n(.*?)\n```"s
+    
+    # found_any = false
+    # toml_path = ""
+    # jl_path = ""
+    
+    # for m in eachmatch(pattern, clean_text)
+    #     filename = m.captures[1]
+    #     content = m.captures[2]
         
-        if fire_neighbors > 0 || rand() < model.lightning_chances
-            model.next_states[agent.id] = TreeState(:fire, current.energy, current.age + 1)
-        else
-            model.next_states[agent.id] = TreeState(:tree, current.energy + 1, current.age + 1)
-        end
-    else
-        model.next_states[agent.id] = current
-    end
+    #     file_path = abspath(joinpath(output_dir, filename))
+        
+    #     open(file_path, "w") do f
+    #         write(f, content)
+    #     end
+        
+    #     println("--> [OK] Saved: $file_path")
+    #     found_any = true
+
+    #     if endswith(filename, ".toml")
+    #         toml_path = file_path
+    #     elseif endswith(filename, ".jl")
+    #         jl_path = file_path
+    #     end
+    # end
+
+    # explanation = clean_text
+    # for m in eachmatch(pattern, clean_text)
+    #     explanation = replace(explanation, m.match => "")
+    # end
+    
+    # explanation = replace(explanation, r"<\|im_start\|>.*?(<\|im_end\|>|$)"s => "")
+    # explanation = strip(explanation)
+
+    # if !isempty(explanation)
+    #     println("\n--- LLM Decision-Making Explanation ---")
+    #     println(explanation)
+    #     println("------------------------------\n")
+    # end
+
+    # if !found_any
+    #     @warn "The LLM did not return code blocks in the expected FILENAME format."
+    #     return output_dir
+    # end
+
+    # if !isempty(toml_path)
+    #     println("Executing generated simulation...")
+        
+    #     main_script = isfile("main.jl") ? "main.jl" : abspath(joinpath(@__DIR__, "..", "main.jl"))
+        
+    #     cmd_args = isempty(jl_path) ? `julia $main_script $toml_path` : `julia $main_script $toml_path $jl_path`
+        
+    #     try
+    #         run(cmd_args)
+    #         println("END OF SIMULATION.")
+            
+    #         config = TOML.parsefile(toml_path)
+    #         if haskey(config, "visualization") && haskey(config["visualization"], "filename")
+    #             vid_file = config["visualization"]["filename"]
+    #             vid_path = abspath(vid_file)
+                
+    #             if isfile(vid_path)
+    #                 println("--> Playing video: $vid_path")
+    #                 if Sys.iswindows()
+    #                     run(`cmd /c start "" "$vid_path"`)
+    #                 elseif Sys.isapple()
+    #                     run(`open "$vid_path"`)
+    #                 elseif Sys.islinux()
+    #                     run(`xdg-open "$vid_path"`)
+    #                 end
+    #             else
+    #                 @warn "The generated video was not found on the expected route: $vid_path"
+    #             end
+    #         end
+    #     catch e
+    #         @error "ERROR: executing simulation or playing video: $e"
+    #     end
+    # end
+    
+    # return output_dir
+    
 end
 
-Example of generated forest_fire.toml:
-
-[simulation]
-model_name = "ForestFire_Complex"
-seed = 42
-
-[space]
-type = "grid"
-dimensions = [50, 50]
-periodic = false
-
-[properties]
-lightning_chances = 0.001
-min_to_live = 2
-
-[agents]
-state_type = "TreeState"
-
-[population]
-pop_density = { "TreeState(tree, 10, 1)" = 0.8, "TreeState(fire, 5, 1)" = 0.02, "TreeState(empty, 0, 0)" = 0.18 }
-
-[rules]
-agent_step = "forest_step!"
-model_step = "default_model_step!"
-initialization_rule = "random"
-
-[visualization]
-filename = "videos/forest_struct.mp4"
-title = "Forest Fire with Struct States"
-variable_to_color = "state.status"
-color_scheme = { tree = "green", fire = "red", empty = "white", ash = "gray" }
-agent_shape = "rect"
-frames = 80
-
-----
-Add comments in the code only if necessary.
-
-Finally, give a brief explanation of why you made certain decisions. A summary.
-"""
-
-function build_from_prompt(user_text::String; output_file="examples/llm_generated.toml")
-    println("--> Thinking...)")
+function run_llama(model_path, user_description)
+    prompt_file = abspath(joinpath(@__DIR__, "input_prompt.txt"))
+    output_file = abspath(joinpath(@__DIR__, "output_llm.txt"))
     
-    response = aigenerate(SYSTEM_PROMPT * "\n\nDescripción del usuario:\n" * user_text)
+    full_prompt = "<|im_start|>system\n$SYSTEM_PROMPT<|im_end|>\n<|im_start|>user\n$user_description<|im_end|>\n<|im_start|>assistant\n"
+    write(prompt_file, full_prompt)
     
-    toml_content = response.content
+    llama_exe = abspath(joinpath(@__DIR__, "..", "bin", "llama-cli.exe"))
+    model_abs = abspath(model_path)
     
-    toml_content = replace(toml_content, r"^```toml\n" => "")
-    toml_content = replace(toml_content, r"^```\n" => "")
-    toml_content = replace(toml_content, r"\n```$" => "")
-    # Guardamos el archivo
-    open(output_file, "w") do f
-        write(f, toml_content)
+    # try
+    println("Generating simulation...")
+    cmd = `$llama_exe --model $model_abs -f $prompt_file --n-gpu-layers 99 --ctx-size 8192 --n-predict 4096 --no-display-prompt --log-disable`
+    println("después de cmd")
+    run(cmd)
+    #run(pipeline(cmd, stdin=devnull, stdout=output_file, stderr=devnull))
+    println("después de run")
+
+    if isfile(output_file)
+        response = read(output_file, String)
+        println("Response saved.")
+        return response
     end
-    
-    println("--> ¡Archivo TOML generado con éxito en $output_file!")
-    return output_file
+    # catch e
+    #     @error "The execution failed: $e"
+    #     return ""
+    # finally
+    #     isfile(prompt_file) && rm(prompt_file, force=true)
+    #     isfile(output_file) && rm(output_file, force=true)
+    # end
+    # return ""
 end
+
+ #build_from_prompt("basic plague simulation with death, sick and healthy agents")
+ build_from_prompt("Dime hola y adios")
+
 end

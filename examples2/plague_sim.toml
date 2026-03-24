@@ -1,0 +1,32 @@
+[simulation]
+model_name = "BasicPlagueSimulation"
+seed = 42
+
+[space]
+type = "grid"
+dimensions = [50, 50]
+periodic = true
+
+[properties]
+death_rate = 0.05
+sick_rate = 0.1
+recovery_rate = 0.2
+
+[agents]
+state_type = "SickState"
+
+[population]
+pop_density = { "SickState(sick, 0, 1)" = 0.3, "SickState(healthy, 0, 1)" = 0.6 }
+
+[rules]
+agent_step = "plague_step!"
+model_step = "default_model_step!"
+initialization_rule = "random"
+
+[visualization]
+filename = "videos/basic_plague_sim.mp4"
+title = "Basic Plague Simulation"
+variable_to_color = "state.status"
+color_scheme = { sick = "red", healthy = "green" }
+agent_shape = "rect"
+frames = 120
