@@ -44,7 +44,7 @@ function run_simulation(config)
     model = initialize_model(config)
     println("--> Generating video...")
     # 4. Visualization
-    video_simulation(model, config["visualization"])
+    video_simulation(model, config["visualization"], config["space"])
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

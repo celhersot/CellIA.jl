@@ -32,7 +32,7 @@ function ensure_model_exists()
     return MODEL_PATH
 end
 
-function build_from_prompt(user_text::String; output_dir=joinpath(@__DIR__, "..", "examples2"))
+function build_from_prompt(user_text::String; output_dir=joinpath(@__DIR__, "..", "examples"))
     model_path = ensure_model_exists()
     mkpath(output_dir)
     

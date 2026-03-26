@@ -1,0 +1,31 @@
+[simulation]
+model_name = "ForestFire_Complex"
+seed = 42
+
+[space]
+type = "grid"
+dimensions = [50, 50]
+periodic = false
+
+[properties]
+lightning_chances = 0.001
+min_to_live = 2
+
+[agents]
+state_type = "TreeState"
+
+[population]
+pop_density = { "TreeState(tree, 10, 1)" = 0.8, "TreeState(fire, 5, 1)" = 0.02, "TreeState(empty, 0, 0)" = 0.18 }
+
+[rules]
+agent_step = "forest_step!"
+model_step = "default_model_step!"
+initialization_rule = "random"
+
+[visualization]
+filename = "output_videos/forest_struct.mp4"
+title = "Forest Fire with Struct States"
+variable_to_color = "state.status"
+color_scheme = { tree = "green", fire = "red", empty = "white", ash = "gray" }
+agent_shape = "rect"
+frames = 80

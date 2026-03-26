@@ -14,6 +14,7 @@ function initialize_model(config::Dict)
 
     # Loading rules from CustomEvolutionRules
     rules_conf = config["rules"]
+    space_conf = config["space"]
     agent_step = dummystep
     model_step = dummystep
 
@@ -23,8 +24,6 @@ function initialize_model(config::Dict)
     if haskey(rules_conf, "model_step")
         model_step = getfield(CustomEvolutionRules, Symbol(rules_conf["model_step"]))
     end
-    
-    rng = Xoshiro(get(config["simulation"], "seed", 42))
 
     # Creating the model with UniversalAgent
 
@@ -57,20 +56,70 @@ function initialize_model(config::Dict)
     # Adding the future states for synchronous simulations
     properties[:next_states] = Dict{Int, T}()
 
-    model = StandardABM(
-        UniversalAgent{T},
-        space;
-        agent_step! = agent_step,
-        model_step! = model_step,
-        properties = properties,
-        rng = rng,
-        scheduler = Schedulers.Randomly()
-    )
+    space_type = space_conf["type"]
+    if space_type == "grid"
+        rng = Xoshiro(get(config["simulation"], "seed", 42))
 
-    # Populating the world
-    populate_world!(model, config, T)
+        model = StandardABM(
+            UniversalAgent{T},
+            space;
+            rng = rng,
+            agent_step! = agent_step,
+            model_step! = model_step,
+            properties = properties,
+            scheduler = Schedulers.Randomly()
+        )
 
+        # Populating the world
+        populate_world!(model, config, T)
+    elseif  space_type == "continuous"
+        rng = Random.MersenneTwister(get(config["simulation"], "seed", 42))
+
+        model = StandardABM(
+            T,
+            space;
+            rng = rng,
+            agent_step! = agent_step,
+            properties = properties,
+            container = Vector,
+            scheduler = Schedulers.Randomly())
+
+        # Populating the continuous world
+        populate_continuous_world!(model, config, T)
+    end
     return model
+end
+
+function populate_continuous_world!(model, config, T)
+    println("---> Populating...")
+    agents_conf = config["agents"]
+    pop_conf = config["population"]
+    init_rule = get(config["rules"], "initialization_rule", "random")
+
+    states_to_spawn = []
+
+    if haskey(pop_conf, "pop_quantity")
+        for(state, qty) in pop_conf["pop_quantity"]
+            state = convert_type(state, T)
+            push!(states_to_spawn, (state, qty))
+        end
+    end
+
+    for (state_val, qty) in states_to_spawn
+        for _ in 1:qty
+            vel = rand(abmrng(model), SVector{2, Float64}) .* 2 .- 1
+            add_agent!(
+                model,
+                vel,
+                agents_conf["speed"],
+                agents_conf["cohere_factor"],
+                agents_conf["separation"],
+                agents_conf["separate_factor"],
+                agents_conf["match_factor"],
+                agents_conf["visual_distance"],
+                )
+        end
+    end
 end
 
 function populate_world!(model, config, T)

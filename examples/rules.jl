@@ -1,27 +1,35 @@
 using Agents
 using Random
 
-# eL FOREST FIRE
-function forest_step!(agent, model)
-    if agent.state == "tree"
-        # Regla: Si hay un vecino "fire", me quemo
-        for neighbor in nearby_agents(agent, model)
-            if neighbor.state == "fire"
-                agent.future_state = "fire"
-                break
-            end
-        end
-    elseif agent.state == "fire"
-        # Regla: El fuego se consume y se convierte en ceniza
-        agent.future_state = "ash"
-    elseif agent.state == "ash"
-        # Se queda como ceniza (o podrías hacer que vuelva a crecer)
-        agent.future_state = "ash"
-    end
+struct TreeState
+    status::Symbol  # :tree, :fire, :empty, :ash
+    energy::Int
+    age::Int
 end
 
-function forest_model_step!(model)
-    for agent in allagents(model)
-        agent.state = agent.future_state
+function TreeState(s::String)
+    parts = split(replace(s, r"TreeState\(|\)" => ""), ",")
+    status = Symbol(strip(parts[1]))
+    energy = parse(Int, strip(parts[2]))
+    age = parse(Int, strip(parts[3]))
+    return TreeState(status, energy, age)
+end
+
+function forest_step!(agent, model)
+    current = agent.state
+    
+    if current.status == :fire
+        model.next_states[agent.id] = TreeState(:ash, 0, current.age)
+    
+    elseif current.status == :tree
+        fire_neighbors = count(n -> n.state.status == :fire, nearby_agents(agent, model))
+        
+        if fire_neighbors > 0 || rand() < model.lightning_chances
+            model.next_states[agent.id] = TreeState(:fire, current.energy, current.age + 1)
+        else
+            model.next_states[agent.id] = TreeState(:tree, current.energy + 1, current.age + 1)
+        end
+    else
+        model.next_states[agent.id] = current
     end
 end
