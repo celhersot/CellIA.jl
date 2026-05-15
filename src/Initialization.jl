@@ -200,7 +200,6 @@ function populate_world!(model, config, T)
                 x_start += qty # Siguiente grupo tras el anterior
             end
         end
-        # continuar
     end
 
 function flat_to_pos(idx, dims)

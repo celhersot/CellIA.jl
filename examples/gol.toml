@@ -4,7 +4,7 @@ seed = 125
 
 [space]
 type = "grid"
-dimensions = [50, 50]
+dimensions = [512, 512]
 periodic = true
 
 [properties]
@@ -28,5 +28,6 @@ title = "Conway's Game of Life"
 variable_to_color = "state"
 color_scheme = { true = "black", false = "white" }
 agent_shape = "rect"
+agent_size = 1
 framerate = 10
 frames = 100
