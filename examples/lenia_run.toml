@@ -1,0 +1,34 @@
+[simulation]
+model_name = "Lenia - run! example"
+seed = 42
+
+[space]
+type = "grid"
+dimensions = [128, 128]
+periodic = true
+metric = "chebyshev"
+
+[agents]
+state_type = "Float64"
+
+[population]
+pop_density = { "0.0" = 1.0 }
+
+[properties]
+lenia_mu      = 0.15
+lenia_sigma   = 0.015
+dt            = 0.1
+kernel_radius = 13
+kernel_type   = "gaussian"
+
+[rules]
+initialization_rule = "uniform_float"
+post_init           = "lenia_init!"
+model_step          = "lenia_model_step!"
+
+[run]
+steps        = 200
+output       = "output_data/lenia_run.csv"
+adata        = ["state"]
+photos       = true
+photo_prefix = "output_photos/lenia"

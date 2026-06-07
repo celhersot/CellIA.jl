@@ -1,6 +1,8 @@
 module CustomEvolutionRules
 using Agents
 using Random
+using FFTW
+using LinearAlgebra
 
 # --- DEFAULT MODEL STEP ---
 
@@ -59,33 +61,82 @@ function schelling_step!(agent, model)
     end
 end
 
-# --- LENIA ---
-# --- Lenia (Continuous Cellular Automata) ---
+# --- LENIA (Continuous Cellular Automata via FFT convolution) ---
+#
+# Default kernel: smooth bump (Gaussian-like) used in canonical Lenia.
+# Default growth: bell curve centered at μ, width σ.
+# Both can be overridden per-simulation by storing functions in abmproperties(model):
+#   abmproperties(model)[:kernel_fn] = r -> <your kernel>    (r ∈ [0,1])
+#   abmproperties(model)[:growth_fn] = (u,μ,σ) -> <your growth>
 
-function lenia_step!(agent, model)
-    current_val = parse(Float64, string(agent.state))
-    
-    neighbors = collect(nearby_agents(agent, model))
-    
-    if isempty(neighbors)
-        avg = 0.0
-    else
-        total = sum(parse(Float64, string(n.state)) for n in neighbors)
-        avg = total / length(neighbors)
+_lenia_kernel_fn(r::Float64) = r < 1.0 ? exp(4.0 - 1.0 / (r * (1.0 - r) + 1e-10)) : 0.0
+
+_lenia_growth_fn(u::Float64, μ::Float64, σ::Float64) =
+    2.0 * exp(-((u - μ)^2) / (2.0 * σ^2)) - 1.0
+
+# _lenia_build_kernel! — precomputes the spatial kernel and stores its FFT.
+# Called from lenia_init!; also callable from user-defined post_init functions
+# after setting abmproperties(model)[:kernel_fn].
+function _lenia_build_kernel!(model)
+    dims = size(abmspace(model))
+    R    = Int(get(abmproperties(model), :kernel_radius, 13))
+    kfn  = get(abmproperties(model), :kernel_fn, _lenia_kernel_fn)
+
+    K = zeros(Float64, dims...)
+    for x in 1:dims[1], y in 1:dims[2]
+        dx = min(x - 1, dims[1] - (x - 1))
+        dy = min(y - 1, dims[2] - (y - 1))
+        r  = sqrt(Float64(dx^2 + dy^2)) / R
+        K[x, y] = kfn(r)
     end
 
-    μ, σ = model.lenia_mu, model.lenia_sigma
-    
-    diff = avg - μ
-    growth = 2.0 * exp(-( (diff^2) / (2.0 * σ^2) )) - 1.0
-
-    new_val = current_val + (model.dt * growth)
-    agent.future_state = clamp(new_val, 0.0, 1.0)
+    s = sum(K)
+    s > 0.0 && (K ./= s)
+    abmproperties(model)[:kernel_fft] = fft(K)
 end
 
-# --- PREDATOR PREY --- IMPLEMENTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAR
-function predator_prey_step!(agent, model)
-    # ...
+# lenia_init! — default post_init hook.
+# Builds the kernel FFT from abmproperties(model)[:kernel_fn] (or the default).
+# State randomisation is handled separately via initialization_rule = "uniform_float".
+function lenia_init!(model)
+    kernel_type = string(get(abmproperties(model), :kernel_type, "gaussian"))
+    if kernel_type == "polynomial"
+        abmproperties(model)[:kernel_fn] = (r::Float64) -> max(0.0, 1.0 - r^2)^4
+    end
+    # kernel_type == "custom" → user already set abmproperties(model)[:kernel_fn] earlier
+    _lenia_build_kernel!(model)
+end
+
+# lenia_model_step! — full synchronous update via FFT convolution.
+# Does NOT use next_states; reads A first, writes back after, so update is coherent.
+function lenia_model_step!(model)
+    dims = size(abmspace(model))
+
+    # 1. Snapshot current state into a matrix
+    A = zeros(Float64, dims...)
+    for agent in allagents(model)
+        A[agent.pos[1], agent.pos[2]] = agent.state
+    end
+
+    # 2. U = K ⊛ A  (circular convolution via FFT)
+    U = real(ifft(fft(A) .* model.kernel_fft))
+
+    # 3. Apply growth function element-wise and clamp
+    μ   = Float64(model.lenia_mu)
+    σ   = Float64(model.lenia_sigma)
+    dt  = Float64(model.dt)
+    gfn = get(abmproperties(model), :growth_fn, _lenia_growth_fn)
+
+    A_new = clamp.(A .+ dt .* gfn.(U, μ, σ), 0.0, 1.0)
+
+    # 4. Write new states back to agents
+    for agent in allagents(model)
+        agent.state = A_new[agent.pos[1], agent.pos[2]]
+    end
+end
+
+# --- PREDATOR PREY (stub) ---
+function predator_prey_step!(_agent, _model)
 end
 
 

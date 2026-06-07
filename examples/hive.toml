@@ -1,0 +1,30 @@
+[simulation]
+model_name = "BeeHive"
+seed = 42
+
+[space]
+type = "hexagonal"
+dimensions = [12, 14]
+periodic = false
+
+[agents]
+state_type = "Bool"
+
+[population]
+pop_quantity = { true = 25 }
+
+[rules]
+agent_step = "bee_step!"
+initialization_rule = "random"
+
+[visualization]
+filename = "output_videos/hive.mp4"
+frames = 80
+framerate = 10
+title = "Bee Hive Simulation"
+agent_size = 15
+color_scheme = { true = "black" }
+variable_to_color = "state"
+agent_shape = "hexagon"
+cell_color_property = "honey"
+cell_color_max = 15.0

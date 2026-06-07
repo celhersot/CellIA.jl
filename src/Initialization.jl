@@ -4,6 +4,7 @@ using Agents
 using Random
 using ..UniversalAgents
 using ..SpaceDefinition
+using ..HexagonalSpace
 using ..CustomEvolutionRules
 
 export initialize_model
@@ -70,9 +71,22 @@ function initialize_model(config::Dict)
             scheduler = Schedulers.Randomly()
         )
 
-        # Populating the world
         populate_world!(model, config, T)
-    elseif  space_type == "continuous"
+    elseif space_type == "hexagonal"
+        rng = Xoshiro(get(config["simulation"], "seed", 42))
+
+        model = StandardABM(
+            UniversalAgent{T},
+            space;
+            rng = rng,
+            agent_step! = agent_step,
+            model_step! = model_step,
+            properties = properties,
+            scheduler = Schedulers.Randomly()
+        )
+
+        populate_world!(model, config, T)
+    elseif space_type == "continuous"
         rng = Random.MersenneTwister(get(config["simulation"], "seed", 42))
 
         model = StandardABM(
@@ -87,6 +101,13 @@ function initialize_model(config::Dict)
         # Populating the continuous world
         populate_continuous_world!(model, config, T)
     end
+
+    # Optional one-time setup after model creation (e.g. kernel precomputation).
+    if haskey(rules_conf, "post_init")
+        post_init_fn = getfield(CustomEvolutionRules, Symbol(rules_conf["post_init"]))
+        Base.invokelatest(post_init_fn, model)
+    end
+
     return model
 end
 
@@ -94,7 +115,6 @@ function populate_continuous_world!(model, config, T)
     println("---> Populating...")
     agents_conf = config["agents"]
     pop_conf = config["population"]
-    init_rule = get(config["rules"], "initialization_rule", "random")
 
     states_to_spawn = []
 
@@ -105,7 +125,7 @@ function populate_continuous_world!(model, config, T)
         end
     end
 
-    for (state_val, qty) in states_to_spawn
+    for (_, qty) in states_to_spawn
         for _ in 1:qty
             vel = rand(abmrng(model), SVector{2, Float64}) .* 2 .- 1
             add_agent!(
@@ -124,17 +144,20 @@ end
 
 function populate_world!(model, config, T)
     println("---> Populating...")
-    agents_conf = config["agents"]
-    pop_conf = config["population"]
-    #default_meta = get(agents_conf, "metadata", Dict{String, Any}())
-
-    # Cell states
-    dims = size(abmspace(model))
-    total_slots = prod(dims)
-    grid_states = fill(:empty, total_slots) # temporal
-
+    dims      = size(abmspace(model))
     init_rule = get(config["rules"], "initialization_rule", "random")
 
+    # Fill every cell with a uniform random float in [0,1].
+    # Does not require a [population] section in the TOML.
+    if init_rule == "uniform_float"
+        for x in 1:dims[1], y in 1:dims[2]
+            add_agent!((x, y), model; state = rand(abmrng(model)))
+        end
+        return
+    end
+
+    pop_conf    = config["population"]
+    total_slots = prod(dims)
     states_to_spawn = []
 
     # Density or quantity?
@@ -215,7 +238,7 @@ function convert_type(val, T)
     _to_type(v::String, ::Type{U}) where U <: Number = parse(U, v)
     
     _to_type(v::String, ::Type{U}) where U = try U(v) catch; v end
-    _to_type(v, U) = v
+    _to_type(v, _) = v
 
     return _to_type(val, T)
 end

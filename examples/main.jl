@@ -2,6 +2,7 @@ import Pkg
 
 using TOML
 
+include("../src/spaces/HexagonalSpace.jl")
 include("../src/UniversalAgents.jl")
 include("../src/CustomEvolutionRules.jl")
 include("../src/SpaceDefinition.jl")
@@ -34,17 +35,31 @@ function main(config_file::String, rules_file::Union{String, Nothing}=nothing)
         println("--> No se proporcionó archivo de reglas. Usando reglas predefinidas.")
     end
 
-    Base.invokelatest(run_simulation, config)
-    println("--> Done. Output in: $(config["visualization"]["filename"])")
+    Base.invokelatest(_execute, config)
+    println("--> Done.")
 end
 
-function run_simulation(config)
-     # 3. Initialization
-    println("--> Initializing $(config["simulation"]["model_name"])...")
-    model = initialize_model(config)
-    println("--> Generating video...")
-    # 4. Visualization
-    video_simulation(model, config["visualization"], config["space"])
+function _execute(config)
+    name = config["simulation"]["model_name"]
+    viz      = get(config, "visualization", nothing)
+    run_conf = get(config, "run", nothing)
+
+    # Each output gets its own freshly-initialized model so they are independent
+    # (run! and video would otherwise advance the same model cumulatively).
+    if !isnothing(run_conf)
+        println("--> Initializing $name (run)...")
+        model = initialize_model(config)
+        run_simulation(model, run_conf,
+                       isnothing(viz) ? Dict{String,Any}() : viz,
+                       config["space"])
+    end
+
+    if !isnothing(viz) && haskey(viz, "filename")
+        println("--> Initializing $name (video)...")
+        model = initialize_model(config)
+        println("--> Generating video...")
+        video_simulation(model, viz, config["space"])
+    end
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
