@@ -20,7 +20,8 @@ function get_agent_color(a, color_scheme)
 end
 
 const SPECIAL_FUNCTIONS = Dict(
-    "marker" => marker_shape,
+    "marker" => marker_shape,   # legacy alias
+    "arrow"  => marker_shape,   # oriented arrow for continuous-space agents (reusable)
 )
 
 # ── Shared helpers ─────────────────────────────────────────────────────────────

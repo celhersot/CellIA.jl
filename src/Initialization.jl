@@ -114,31 +114,33 @@ end
 function populate_continuous_world!(model, config, T)
     println("---> Populating...")
     agents_conf = config["agents"]
-    pop_conf = config["population"]
+    pop_conf    = config["population"]
 
-    states_to_spawn = []
+    # User-defined fields = struct fields minus the ones @agent injects automatically.
+    auto_fields  = (:id, :pos, :vel)
+    extra_fields = filter(f -> !(f in auto_fields), collect(fieldnames(T)))
 
+    # Total number of agents to spawn (sum over pop_quantity entries).
+    total = 0
     if haskey(pop_conf, "pop_quantity")
-        for(state, qty) in pop_conf["pop_quantity"]
-            state = convert_type(state, T)
-            push!(states_to_spawn, (state, qty))
+        for (_, qty) in pop_conf["pop_quantity"]
+            total += qty
         end
+    else
+        error("El espacio continuo requiere [population] con pop_quantity.")
     end
 
-    for (_, qty) in states_to_spawn
-        for _ in 1:qty
-            vel = rand(abmrng(model), SVector{2, Float64}) .* 2 .- 1
-            add_agent!(
-                model,
-                vel,
-                agents_conf["speed"],
-                agents_conf["cohere_factor"],
-                agents_conf["separation"],
-                agents_conf["separate_factor"],
-                agents_conf["match_factor"],
-                agents_conf["visual_distance"],
-                )
+    for _ in 1:total
+        vel  = rand(abmrng(model), SVector{2, Float64}) .* 2 .- 1
+        # Pull each struct field's value from [agents] by name (no hardcoding).
+        vals = Any[]
+        for f in extra_fields
+            key = string(f)
+            haskey(agents_conf, key) ||
+                error("El campo '$key' del struct $(T) no aparece en [agents] del TOML.")
+            push!(vals, convert_type(agents_conf[key], fieldtype(T, f)))
         end
+        add_agent!(model, vel, vals...)
     end
 end
 

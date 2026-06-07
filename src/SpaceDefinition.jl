@@ -15,11 +15,17 @@ function create_space(config::Dict)
     elseif type == "hexagonal"
         return HexagonalGridSpace(dims; periodic = periodic)
     elseif type == "continuous"
-        visual_distance = config["agents"]["visual_distance"]
         extent = Float64.(dims)
-
-        #return ContinuousSpace(extent; periodic = periodic, spacing = spacing, update_vel! = update_vel)
-        return ContinuousSpace(extent; periodic = periodic, spacing = visual_distance / 1.5)
+        # spacing is optional: explicit [space].spacing, else derived from
+        # [agents].visual_distance if present, else a sensible default.
+        spacing = if haskey(space_conf, "spacing")
+            Float64(space_conf["spacing"])
+        elseif haskey(get(config, "agents", Dict()), "visual_distance")
+            Float64(config["agents"]["visual_distance"]) / 1.5
+        else
+            minimum(extent) / 10.0
+        end
+        return ContinuousSpace(extent; periodic = periodic, spacing = spacing)
     else
         error("Unrecognized or unsupported space type: '$type'")
     end

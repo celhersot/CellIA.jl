@@ -1,0 +1,30 @@
+[simulation]
+model_name = "Particles"
+seed = 42
+
+[space]
+type = "continuous"
+dimensions = [100, 100]
+periodic = true
+
+[agents]
+state_type = "Particle"
+speed = 1.0
+attraction = 0.1
+visual_distance = 6.0
+
+[population]
+pop_quantity = { "Particle" = 80 }
+
+[rules]
+agent_step = "agent_step!"
+initialization_rule = "random"
+
+[visualization]
+filename = "output_videos/particles.mp4"
+title = "Particles"
+variable_to_color = "state"
+color_scheme = { Particle = "cyan" }
+agent_shape = "arrow"
+frames = 60
+framerate = 20

@@ -1,0 +1,6 @@
+root     ::= "{" ws "\"category\"" ws ":" ws category ws "," ws
+                  "\"approach\"" ws ":" ws string ws "," ws
+                  "\"reason\""   ws ":" ws string ws "}"
+category ::= "\"grid_discrete\"" | "\"continuous_field\"" | "\"continuous_space\"" | "\"hexagonal\""
+string   ::= "\"" ( [^"\\] | "\\" . )* "\""
+ws       ::= [ \t\n]*

@@ -1,0 +1,48 @@
+CATEGORY: continuous_field — continuous-valued cellular automata (the Lenia family). Each grid cell holds a Float64 in [0,1] that evolves by FFT convolution with a smooth kernel.
+
+SPACE: type="grid", periodic=true. state_type="Float64".
+RULES: model_step="lenia_model_step!"  post_init="lenia_init!"  initialization_rule="uniform_float". Do NOT set agent_step.
+POPULATION: with initialization_rule="uniform_float" every cell is seeded with a random float automatically; keep a minimal section: pop_density = { "0.0" = 1.0 }.
+PROPERTIES: lenia_mu, lenia_sigma, dt, kernel_radius, kernel_type ("gaussian" | "polynomial").
+
+BUILT-INS: lenia_model_step! and lenia_init! already exist — for standard Lenia you write NO _rules.jl at all.
+ADVANCED (optional _rules.jl): only to redefine the kernel or growth function, by setting abmproperties(model)[:kernel_fn] / abmproperties(model)[:growth_fn] inside a custom post_init function. Not needed for standard Lenia.
+
+VISUALIZATION: variable_to_color="state"; color_scheme="viridis" (a named palette string → heatmap rendering); agent_shape="rect"; agent_size=1.
+
+EXAMPLE — standard Lenia (NO _rules.jl needed):
+FILENAME: lenia.toml
+```toml
+[simulation]
+model_name = "Lenia"
+seed = 42
+[space]
+type = "grid"
+dimensions = [128, 128]
+periodic = true
+metric = "chebyshev"
+[agents]
+state_type = "Float64"
+[population]
+pop_density = { "0.0" = 1.0 }
+[properties]
+lenia_mu      = 0.15
+lenia_sigma   = 0.015
+dt            = 0.1
+kernel_radius = 13
+kernel_type   = "gaussian"
+[rules]
+initialization_rule = "uniform_float"
+post_init           = "lenia_init!"
+model_step          = "lenia_model_step!"
+[visualization]
+filename          = "output_videos/lenia.mp4"
+frames            = 200
+framerate         = 20
+title             = "Lenia"
+variable_to_color = "state"
+color_scheme      = "viridis"
+agent_shape       = "rect"
+agent_size        = 1
+```
+(Standard Lenia needs only the .toml — do not emit a _rules.jl.)
