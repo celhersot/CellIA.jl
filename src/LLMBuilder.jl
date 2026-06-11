@@ -8,26 +8,21 @@ module LLMBuilder
 #   3. generate + validate    -> per-category system prompt, static validation, repair loop
 #   4. run + repair-on-error  -> execute; on Julia error, feed stderr back and regenerate
 #
-# Backend: llama-server over HTTP (confirmed). llama-cli is an emergency fallback.
+# Backend: llama-cli (bin/llama-cli.exe) — one-shot via -f prompt file, no server.
 
 using Downloads
 using TOML
-using HTTP
 using JSON
 
 export build_from_prompt, route, validate_files, load_prompt
 
-# ── Model / server configuration ────────────────────────────────────────────────
+# ── Model configuration ──────────────────────────────────────────────────────────
 
 const MODEL_DIR  = joinpath(@__DIR__, "..", "models")
 const MODEL_NAME = "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
 const MODEL_PATH = joinpath(MODEL_DIR, MODEL_NAME)
-# 1.5B: the model that already worked (~3 min/gen) on this machine. ~1 GB, fits in
-# the MX130's 2 GB VRAM so it runs on the GPU. (A 7B was a mistake — too big here.)
+# 1.5B (~1 GB): small enough to run on CPU in a couple of minutes on any laptop.
 const MODEL_URL  = "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
-
-const SERVER_HOST = get(ENV, "LLAMA_SERVER_HOST", "127.0.0.1")
-const SERVER_PORT = get(ENV, "LLAMA_SERVER_PORT", "8080")
 
 const PROMPTS_DIR = joinpath(@__DIR__, "prompts")
 
@@ -70,7 +65,7 @@ end
 function ensure_model_exists()
     isdir(MODEL_DIR) || mkpath(MODEL_DIR)
     if !isfile(MODEL_PATH)
-        println("--> Descargando modelo (una sola vez, ~9 GB)...")
+        println("--> Descargando modelo (una sola vez, ~1 GB)...")
         try
             Downloads.download(MODEL_URL, MODEL_PATH)
             println("--> Modelo descargado.")
@@ -82,58 +77,77 @@ function ensure_model_exists()
 end
 
 # ── LLM call ─────────────────────────────────────────────────────────────────────
-# Builds a ChatML prompt and sends it to llama-server (/completion). Falls back to
-# llama-cli if the server is unreachable. Returns the assistant text.
+# Runs llama-cli once (no server). The model is loaded, generates, and we capture the
+# assistant turn from its output. Returns the assistant text only.
+#
+# Hard-won notes about THIS build (llama.cpp b9547) on Windows:
+#   * --log-disable, -no-cnv and --simple-io all crash it (0xC0000409). Don't use them.
+#   * On a small GPU (≤2 GB VRAM) full offload crashes intermittently while processing
+#     the prompt. CPU is rock-solid, so we default to CPU. Users with a bigger GPU can
+#     set CELL_IA_GPU_LAYERS=99 (or any number) to offload.
+#   * In conversation mode it echoes the whole prompt and then waits for the next turn on
+#     stdin. We feed it "/exit" so it quits cleanly (exit 0) after one generation. We then
+#     extract only the text after the last <|im_start|>assistant marker (the prompt echo
+#     contains our few-shot examples — parsing the raw output would pick those up instead).
+
+const GPU_LAYERS = parse(Int, get(ENV, "CELL_IA_GPU_LAYERS", "0"))
 
 function llm_call(system::String, user::String;
                   grammar::Union{Nothing,String} = nothing,
-                  n_predict::Int = 4096,
-                  temperature::Float64 = 0.2)
+                  n_predict::Int = 4096)
     prompt = "<|im_start|>system\n$system<|im_end|>\n" *
              "<|im_start|>user\n$user<|im_end|>\n" *
              "<|im_start|>assistant\n"
-    # One-shot CLI call, no server: load model -> generate -> exit. Same simple
-    # approach as your original setup, just split across router + generation calls.
     return _cli_completion(prompt; grammar = grammar, n_predict = n_predict)
 end
 
-function _server_completion(prompt::String; grammar, n_predict, temperature)
-    body = Dict{String,Any}(
-        "prompt"       => prompt,
-        "n_predict"    => n_predict,
-        "temperature"  => temperature,
-        "stop"         => ["<|im_end|>"],
-        "cache_prompt" => true,
-    )
-    grammar !== nothing && (body["grammar"] = grammar)
-    url  = "http://$(SERVER_HOST):$(SERVER_PORT)/completion"
-    resp = HTTP.post(url, ["Content-Type" => "application/json"], JSON.json(body);
-                     connect_timeout = 3, readtimeout = 900, retry = false)
-    data = JSON.parse(String(resp.body))
-    return strip(get(data, "content", ""))
+# Pull out just the assistant's generated text: everything after the LAST assistant
+# marker, trimmed at the trailing stats line. Falls back to the whole text.
+function _extract_assistant(raw::AbstractString)
+    clean = replace(String(raw), r"\e\[[0-9;]*m" => "")   # strip ANSI colours
+    clean = replace(clean, "\r\n" => "\n")
+    marker = "<|im_start|>assistant"
+    idx = findlast(marker, clean)
+    idx !== nothing && (clean = clean[nextind(clean, last(idx)):end])
+    cut = findfirst("[ Prompt:", clean)                   # llama's end-of-turn stats
+    cut !== nothing && (clean = clean[1:prevind(clean, first(cut))])
+    return strip(clean)
 end
 
-function _cli_completion(prompt::String; grammar, n_predict)
+function _cli_completion(prompt::String; grammar, n_predict, timeout_s::Int = 300)
     model_path   = ensure_model_exists()
-    exe_name     = Sys.iswindows() ? "llama-completion.exe" : "llama-completion"
+    exe_name     = Sys.iswindows() ? "llama-cli.exe" : "llama-cli"
     llama_exe    = abspath(joinpath(@__DIR__, "..", "bin", exe_name))
+    prompt_file  = abspath(joinpath(@__DIR__, "llm_input.txt"))
     grammar_file = abspath(joinpath(@__DIR__, "grammar.gbnf"))
-    # -p (prompt string) => one-shot. --n-gpu-layers 99 => use the GPU (the 1.5B fits
-    # in 2 GB VRAM). stdin=devnull => if it tried to go interactive it gets EOF and exits.
-    cmd = `$llama_exe --model $(abspath(model_path)) -p $prompt --n-gpu-layers 99 --ctx-size 8192 --n-predict $n_predict --temp 0.2 --no-display-prompt`
-    if grammar !== nothing
-        write(grammar_file, grammar)
-        cmd = `$cmd --grammar-file $grammar_file`
-    end
-    out = IOBuffer()
+    out_file     = abspath(joinpath(@__DIR__, "llm_output.txt"))
+    stdin_file   = abspath(joinpath(@__DIR__, "llm_stdin.txt"))
     try
-        run(pipeline(ignorestatus(cmd); stdin = devnull, stdout = out, stderr = devnull))
-        return strip(String(take!(out)))
+        write(prompt_file, prompt)
+        # Conversation mode reads the next user turn from stdin after generating; feeding
+        # "/exit" makes llama quit cleanly (exit 0) on its own — no hang, nothing to kill.
+        write(stdin_file, "/exit\n")
+        isfile(out_file) && rm(out_file; force = true)
+        cmd = `$llama_exe --model $(abspath(model_path)) -f $prompt_file --n-gpu-layers $GPU_LAYERS --ctx-size 8192 --n-predict $n_predict --temp 0.2 --no-display-prompt`
+        if grammar !== nothing
+            write(grammar_file, grammar)
+            cmd = `$cmd --grammar-file $grammar_file`
+        end
+        proc = run(pipeline(ignorestatus(cmd); stdin = stdin_file, stdout = out_file, stderr = devnull); wait = false)
+        t0 = time()
+        while process_running(proc) && (time() - t0 < timeout_s); sleep(1); end
+        process_running(proc) && kill(proc)   # safety net if /exit ever fails to quit
+        try; wait(proc); catch; end
+        sleep(0.3)                            # let the output file handle flush/close
+        raw = isfile(out_file) ? read(out_file, String) : ""
+        return _extract_assistant(raw)
     catch e
         @error "Ejecución del modelo falló: $e"
         return ""
     finally
-        try; isfile(grammar_file) && rm(grammar_file; force = true); catch; end
+        for f in (prompt_file, grammar_file, out_file, stdin_file)
+            try; isfile(f) && rm(f; force = true); catch; end
+        end
     end
 end
 
@@ -159,7 +173,7 @@ end
 function route(desc::String; exclude::Vector{String} = String[])
     system = load_router_prompt(exclude)
     for _ in 1:2
-        raw = llm_call(system, desc; grammar = ROUTER_GRAMMAR, n_predict = 256, temperature = 0.1)
+        raw = llm_call(system, desc; grammar = ROUTER_GRAMMAR, n_predict = 256)
         r = parse_router_json(raw)
         r !== nothing && return r
     end
@@ -245,6 +259,14 @@ function validate_files(files::Dict, category::String)
         if !isempty(jl_str) && (occursin("@agent", jl_str) || occursin(r"^\s*using\b"m, jl_str))
             return (false, "En grid_discrete el .jl no debe contener @agent ni using.")
         end
+        # The grid must be fully populated or the automaton freezes on frame 1.
+        if haskey(pop, "pop_density")
+            dens = values(pop["pop_density"])
+            total = sum(Float64.(collect(dens)); init = 0.0)
+            isapprox(total, 1.0; atol = 0.02) ||
+                return (false, "pop_density debe sumar 1.0 para llenar todo el grid (suma $total). " *
+                               "Para Bool usa { true = 0.3, false = 0.7 }.")
+        end
 
     elseif category == "continuous_field"
         get(agents, "state_type", "") == "Float64" ||
@@ -284,7 +306,10 @@ function _parse_filename_blocks(text::AbstractString)
     files   = Dict{String,String}()
     for m in eachmatch(pattern, text)
         content = strip(m.captures[2])
-        (isempty(content) || content == "...") && continue
+        # Skip the placeholder template from the system prompt's OUTPUT FORMAT section
+        # (it gets echoed back by the model in some runs).
+        (isempty(content) || content == "..." ||
+            occursin("toml content", content) || occursin("julia content", content)) && continue
         files[strip(m.captures[1])] = content
     end
     return files

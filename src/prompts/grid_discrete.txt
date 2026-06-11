@@ -1,23 +1,77 @@
 CATEGORY: grid_discrete — discrete-state cellular automata on a square grid.
 
-SPACE: type="grid". state_type = "Bool" | "Int" | "Symbol" | "String" | "Float64" (discrete via thresholds).
-UPDATE: synchronous. The agent step writes the NEXT state to model.next_states[agent.id]; do NOT mutate agent.state directly.
-RULES: agent_step="<your_fn!>"  model_step="default_model_step!"  initialization_rule="random" (or "center_filled" / "horizontal_line").
-POPULATION: pop_density = { "state" = fraction, ... } (fractions sum to 1.0) OR pop_quantity = { "state" = N, ... }.
+SPACE: type="grid". Every cell is an agent. state_type = "Bool" | "Int" | "Symbol" | "String".
+
+THE GRID MUST BE FULLY POPULATED. In [population], pop_density values MUST sum to 1.0 so
+that every cell of the grid holds an agent. If they sum to less than 1.0 the rest of the
+grid is left EMPTY (no agent there), the automaton has nothing to evolve into, and the
+video freezes on the first frame. This is the most common mistake — do not make it.
+
+STATE VALUES — the keys you write in pop_density and color_scheme MUST be literal values of
+state_type, never invented labels:
+- state_type="Bool"  -> keys are  true  and  false   (NOT "alive"/"dead").
+- state_type="Int"   -> keys are  0, 1, 2, ...
+- state_type="Symbol"-> keys are quoted names like "tree", "fire", "empty".
+
+UPDATE: synchronous. An agent step writes the NEXT state to model.next_states[agent.id];
+NEVER mutate agent.state directly. model_step = "default_model_step!" flushes them.
 NEIGHBOURS: nearby_agents(agent, model).
 
-BUILT-IN rules — use these and write NO _rules.jl when they fit:
-- gol_step!        Game of Life (state_type="Bool"; properties: min_to_live, max_to_live)
-- rps_step!        rock-paper-scissors (state_type="Symbol", values :rock/:paper/:scissors; property: threshold)
-- schelling_step!  Schelling segregation (property: min_identical)
+BUILT-IN rules — PREFER THESE. When one fits, set agent_step to it and write NO _rules.jl:
+- gol_step!        Conway's Game of Life and any "live/dead from neighbour count" automaton.
+                   state_type="Bool"; [properties] min_to_live and max_to_live (the two
+                   neighbour counts a live cell needs to survive — classic GoL: 2 and 3).
+- rps_step!        rock-paper-scissors. state_type="Symbol", values :rock/:paper/:scissors;
+                   [properties] threshold.
+- schelling_step!  Schelling segregation. [properties] min_identical.
 
-If you need a CUSTOM rule, write a _rules.jl containing ONLY step functions. In that file:
+If a request is Conway's Game of Life (or a trivial variant), use gol_step! — do NOT write a
+custom rule. Only write a _rules.jl when NO built-in fits.
+
+CUSTOM RULE (only when needed): write a _rules.jl with ONLY step functions. In that file:
 - NO using / import / module / @agent.
-- signature: function my_step!(agent, model) ... model.next_states[agent.id] = new_value ... end
+- signature: function my_step!(agent, model) ... end
+- Write model.next_states[agent.id] on EVERY path, including the "nothing changes" case
+  (set it to agent.state). An agent that is never written keeps its old state, which
+  silently breaks synchronous models — always write it.
 
-VISUALIZATION: variable_to_color="state"; color_scheme = { state = "colour", ... }; agent_shape = "rect" (or "circle", or a Dict mapping state → shape).
+VISUALIZATION: variable_to_color="state"; color_scheme keys = the state values (see above);
+agent_shape="rect" (or "circle"); agent_size small for big grids (1 for a 256+ grid).
 
-EXAMPLE — forest fire (Symbol state, custom rule):
+EXAMPLE — Conway's Game of Life (Bool, BUILT-IN rule, NO _rules.jl needed):
+FILENAME: gol.toml
+```toml
+[simulation]
+model_name = "GameOfLife"
+seed = 42
+[space]
+type = "grid"
+dimensions = [200, 200]
+periodic = true
+metric = "chebyshev"
+[properties]
+min_to_live = 2
+max_to_live = 3
+[agents]
+state_type = "Bool"
+[population]
+pop_density = { true = 0.3, false = 0.7 }
+[rules]
+agent_step = "gol_step!"
+model_step = "default_model_step!"
+initialization_rule = "random"
+[visualization]
+filename = "output_videos/gol.mp4"
+title = "Conway's Game of Life"
+variable_to_color = "state"
+color_scheme = { true = "black", false = "white" }
+agent_shape = "rect"
+agent_size = 3
+framerate = 10
+frames = 150
+```
+
+EXAMPLE — forest fire (Symbol, CUSTOM rule; note densities sum to 1.0 and every branch writes):
 FILENAME: fire.toml
 ```toml
 [simulation]
@@ -25,13 +79,13 @@ model_name = "ForestFire"
 seed = 42
 [space]
 type = "grid"
-dimensions = [60, 60]
+dimensions = [100, 100]
 periodic = false
 metric = "chebyshev"
 [agents]
 state_type = "Symbol"
 [population]
-pop_density = { "tree" = 0.7, "fire" = 0.05, "empty" = 0.25 }
+pop_density = { "tree" = 0.7, "fire" = 0.01, "empty" = 0.29 }
 [rules]
 agent_step = "fire_step!"
 model_step = "default_model_step!"
@@ -42,7 +96,7 @@ title = "Forest Fire"
 variable_to_color = "state"
 color_scheme = { tree = "darkgreen", fire = "orange", empty = "beige", ash = "gray" }
 agent_shape = "rect"
-agent_size = 10
+agent_size = 6
 framerate = 10
 frames = 120
 ```

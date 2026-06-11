@@ -12,7 +12,12 @@ DECISION HINTS:
 - "hexagon / honeycomb / hive / six-sided cells" → hexagonal.
 - discrete cells with simple local neighbour rules → grid_discrete (the most general; choose it when unsure between discrete options).
 
-Respond with ONLY a JSON object and nothing else:
-{"category": "<one of the four>", "approach": "<one sentence, written IN THE SAME LANGUAGE AS THE USER, describing what you will build>", "reason": "<short justification, in the user's language>"}
+Respond with ONLY this JSON object, nothing before or after it:
+{"approach": "<ONE natural-language sentence, in the SAME LANGUAGE as the user, describing the simulation you will build — this is a human sentence, NOT a category name>", "category": "<exactly one of: grid_discrete, continuous_field, continuous_space, hexagonal>"}
+
+First write the "approach" sentence describing the model in plain words, THEN pick the "category" value that matches that sentence.
+
+Example for "Conway's game of life":
+{"approach": "A grid of cells that are alive or dead and update from their neighbours each step.", "category": "grid_discrete"}
 
 If the instructions say NOT to use certain categories, choose among the remaining ones.
