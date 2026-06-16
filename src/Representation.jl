@@ -334,6 +334,22 @@ function _write_csv(path::String, df)
     end
 end
 
+# Resolve one [run].adata / [run].mdata entry.
+# If the name matches a FUNCTION defined in CustomEvolutionRules, return the function
+# object — Agents.jl run! then samples f(model) (mdata) or f(agent) (adata) every step,
+# which is how a *computed* metric (total energy, entropy, active-cell count, …) is
+# collected. Otherwise return a Symbol, i.e. a plain model property / agent field name
+# (the previous behaviour). Generic: any model can declare a metric by naming a function
+# in its rules file — nothing here is specific to Lenia or to "energy".
+function _resolve_metric(key)
+    sym = Symbol(key)
+    if isdefined(Main.CustomEvolutionRules, sym)
+        val = getfield(Main.CustomEvolutionRules, sym)
+        val isa Function && return val
+    end
+    return sym
+end
+
 function run_simulation(model, run_config, viz_config, space_config)
     steps      = get(run_config, "steps",        100)
     output     = get(run_config, "output",        "output_data/results.csv")
@@ -342,8 +358,8 @@ function run_simulation(model, run_config, viz_config, space_config)
     photos     = get(run_config, "photos",       false)
     photo_pfx  = get(run_config, "photo_prefix", "output_photos/sim")
 
-    adata = isempty(adata_keys) ? nothing : [Symbol(k) for k in adata_keys]
-    mdata = isempty(mdata_keys) ? nothing : [Symbol(k) for k in mdata_keys]
+    adata = isempty(adata_keys) ? nothing : [_resolve_metric(k) for k in adata_keys]
+    mdata = isempty(mdata_keys) ? nothing : [_resolve_metric(k) for k in mdata_keys]
 
     if photos
         photo_simulation(model, viz_config, space_config, "$(photo_pfx)_step0.png")

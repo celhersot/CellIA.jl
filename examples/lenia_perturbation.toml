@@ -1,0 +1,52 @@
+[simulation]
+model_name = "Lenia bajo perturbacion"
+seed = 42
+
+[space]
+type = "grid"
+dimensions = [128, 128]
+periodic = true
+metric = "chebyshev"
+
+[agents]
+state_type = "Float64"
+
+# [population] formal: uniform_float crea un agente por celda; el post_init siembra el orbium.
+[population]
+pop_density = { "0.0" = 1.0 }
+
+[properties]
+# --- Kernel / crecimiento (parametros canonicos del orbium = defaults del framework) ---
+lenia_mu      = 0.15
+lenia_sigma   = 0.015
+dt            = 0.1
+kernel_radius = 13
+kernel_type   = "gaussian"
+# --- Perturbacion (Fase 3): knobs leidos por lenia_noisy_step! ---
+sigma_noise      = 0.04       # sigma del ruido N(0, sigma); 0 = sin ruido
+noise_start_step = 120        # K: empezar a perturbar tras estabilizar la estructura
+noise_end_step   = 999999     # = start -> one-shot; muy grande -> ruido sostenido
+noise_scope      = "support"  # "support" (solo el organismo, A>eps) | "field" (todo el campo)
+
+[rules]
+initialization_rule = "uniform_float"
+post_init           = "lenia_perturbation_init!"
+model_step          = "lenia_noisy_step!"
+
+# PATH DE DATOS: energia/cohesion en tiempo real -> CSV (mdata nombra FUNCIONES, requiere C1).
+[run]
+steps  = 400
+output = "output_data/lenia_perturbation.csv"
+adata  = []                                           # vacio -> se guarda mdf (las metricas), no el estado por-agente
+mdata  = ["total_energy", "mean_state", "active_cells"]
+
+# PATH DE VIDEO: misma trayectoria que el run (mismo seed + ruido con abmrng).
+[visualization]
+filename          = "output_videos/lenia_perturbation.mp4"
+frames            = 400
+framerate         = 30
+title             = "Lenia bajo perturbacion estocastica"
+variable_to_color = "state"
+color_scheme      = "viridis"
+agent_shape       = "rect"
+agent_size        = 1

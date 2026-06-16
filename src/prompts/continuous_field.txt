@@ -1,14 +1,92 @@
 CATEGORY: continuous_field — continuous-valued cellular automata (the Lenia family). Each grid cell holds a Float64 in [0,1] that evolves by FFT convolution with a smooth kernel.
 
 SPACE: type="grid", periodic=true. state_type="Float64".
-RULES: model_step="lenia_model_step!"  post_init="lenia_init!"  initialization_rule="uniform_float". Do NOT set agent_step.
-POPULATION: with initialization_rule="uniform_float" every cell is seeded with a random float automatically; keep a minimal section: pop_density = { "0.0" = 1.0 }.
+RULES: post_init="lenia_init!"  Do NOT set agent_step.
+  model_step: choose ONE —
+    "lenia_model_step!"  → deterministic Lenia (no perturbation).
+    "lenia_noisy_step!"  → Lenia + an optional stochastic perturbation field (see PERTURBATION).
+  initialization_rule: choose based on what the user wants to SEE —
+    "lenia_orbium"   → seeds the canonical Orbium: ONE coherent organism that GLIDES smoothly
+                       across the grid. USE THIS whenever the user asks for "un organismo / ser
+                       vivo / criatura / forma de vida / bicho que se mueve/desplaza". This is the
+                       classic Lenia creature. Requires the Orbium parameters (see EXAMPLE) and a
+                       grid of at least 64×64 so it has room to travel.
+    "uniform_float"  → seeds random noise everywhere → a chaotic, boiling "soup" of textures with
+                       NO single creature. Only use this when the user explicitly wants random
+                       initial conditions / emergent patterns from noise, NOT a defined organism.
+POPULATION: the state is seeded by initialization_rule, so keep a minimal section: pop_density = { "0.0" = 1.0 }.
 PROPERTIES: lenia_mu, lenia_sigma, dt, kernel_radius, kernel_type ("gaussian" | "polynomial").
 
-BUILT-INS: lenia_model_step! and lenia_init! already exist — for standard Lenia you write NO _rules.jl at all.
-ADVANCED (optional _rules.jl): only to redefine the kernel or growth function, by setting abmproperties(model)[:kernel_fn] / abmproperties(model)[:growth_fn] inside a custom post_init function. Not needed for standard Lenia.
+BUILT-INS: lenia_model_step!, lenia_noisy_step!, lenia_init! already exist — for standard Lenia (even with perturbation) you write NO _rules.jl at all.
+
+FIXED IDENTIFIERS — copy these strings VERBATIM. They are API names, NOT a theme to rename:
+  rule names:    "lenia_init!", "lenia_model_step!", "lenia_noisy_step!"
+  property keys: lenia_mu, lenia_sigma, dt, kernel_radius, kernel_type
+  init rules:    initialization_rule = "lenia_orbium" (a gliding creature) | "uniform_float" (random soup)
+  ONLY model_name, title and filename are free text you may theme to the user's request
+  (e.g. model_name="Organismo", title="Organismo"). Everything else above stays literal.
+  NEVER rename lenia_* to organism_*/creature_*/bicho_*/<theme>_* — those names DO NOT EXIST
+  and the simulation crashes with `UndefVarError`. A "living organism / ser vivo / bicho"
+  that moves smoothly IS standard Lenia: reuse the built-ins EXACTLY and emit NO _rules.jl.
+
+PERTURBATION (optional — only when the user asks for noise / mutations / random perturbations / "see if it survives"):
+  Set model_step="lenia_noisy_step!" and add to [properties]:
+    sigma_noise       Float64 ≥ 0   — std-dev of the Gaussian noise N(0,σ) added each step (0 = none). Typical 0.01–0.06; above ~0.07 the structure usually disintegrates.
+    noise_start_step  Int ≥ 0       — first step the noise is injected (let the structure stabilise first, e.g. 100–150).
+    noise_end_step    Int ≥ 0       — last step with noise (= start → one-shot; a very large number → sustained).
+    noise_scope       "support" | "field"  — perturb only the organism (cells with A>0) or the whole field. Prefer "support".
+  To MONITOR the experiment, add a [run] section (this drives run!) so the per-step time-series is exported:
+    [run] steps=400  output="output_data/<name>.csv"  mdata=["total_energy","mean_state","active_cells"]  adata=[]
+  IMPORTANT: total_energy, mean_state and active_cells are MODEL-level metrics → they MUST go in
+  mdata, NEVER in adata. Always set adata=[] (empty). Do NOT swap mdata and adata: putting these
+  metrics in adata makes run! call them per-agent and crash.
+
+ADVANCED (optional _rules.jl — only to DESIGN a new growth function G or kernel):
+  Write a custom post_init that sets abmproperties(model)[:growth_fn] and/or [:kernel_fn], then calls _lenia_build_kernel!(model). Reference it from [rules].post_init.
+  Keep growth_fn within a STABLE-CAPABLE family (do NOT invent arbitrary math):
+    • single Gaussian bell (canonical):  (u,μ,σ) -> 2*exp(-((u-μ)^2)/(2σ^2)) - 1
+    • double-peaked bell:                (u,μ,σ) -> (exp(-((u-μ)^2)/(2σ^2)) + 0.5*exp(-((u-μ-0.05)^2)/(2σ^2)))*4/3 - 1
+  Keep kernel_fn a smooth radial bump on r∈[0,1] (e.g. r -> max(0.0, 1 - r^2)^4). model_step stays "lenia_model_step!" or "lenia_noisy_step!".
 
 VISUALIZATION: variable_to_color="state"; color_scheme="viridis" (a named palette string → heatmap rendering); agent_shape="rect"; agent_size=1.
+
+EXAMPLE — a living organism that glides across the screen (Orbium; NO _rules.jl needed).
+This is the right template for "un ser vivo / organismo / criatura que se mueve":
+FILENAME: organismo.toml
+```toml
+[simulation]
+model_name = "Organismo"
+seed = 42
+[space]
+type = "grid"
+dimensions = [128, 128]
+periodic = true
+metric = "chebyshev"
+[agents]
+state_type = "Float64"
+[population]
+pop_density = { "0.0" = 1.0 }
+[properties]
+lenia_mu      = 0.15
+lenia_sigma   = 0.017
+dt            = 0.1
+kernel_radius = 13
+kernel_type   = "gaussian"
+[rules]
+initialization_rule = "lenia_orbium"
+post_init           = "lenia_init!"
+model_step          = "lenia_model_step!"
+[visualization]
+filename          = "output_videos/organismo.mp4"
+frames            = 300
+framerate         = 30
+title             = "Organismo"
+variable_to_color = "state"
+color_scheme      = "viridis"
+agent_shape       = "rect"
+agent_size        = 1
+```
+(The Orbium parameters above are REQUIRED for it to glide: μ=0.15, σ=0.017, dt=0.1, R=13, gaussian. Do not change them.)
 
 EXAMPLE — standard Lenia (NO _rules.jl needed):
 FILENAME: lenia.toml
@@ -46,3 +124,49 @@ agent_shape       = "rect"
 agent_size        = 1
 ```
 (Standard Lenia needs only the .toml — do not emit a _rules.jl.)
+
+EXAMPLE — Lenia with stochastic perturbation (NO _rules.jl needed; uses built-in lenia_noisy_step!):
+FILENAME: lenia_noisy.toml
+```toml
+[simulation]
+model_name = "Lenia con ruido"
+seed = 42
+[space]
+type = "grid"
+dimensions = [128, 128]
+periodic = true
+metric = "chebyshev"
+[agents]
+state_type = "Float64"
+[population]
+pop_density = { "0.0" = 1.0 }
+[properties]
+lenia_mu         = 0.15
+lenia_sigma      = 0.015
+dt               = 0.1
+kernel_radius    = 13
+kernel_type      = "gaussian"
+sigma_noise      = 0.04
+noise_start_step = 120
+noise_end_step   = 999999
+noise_scope      = "support"
+[rules]
+initialization_rule = "uniform_float"
+post_init           = "lenia_init!"
+model_step          = "lenia_noisy_step!"
+[run]
+steps  = 400
+output = "output_data/lenia_noisy.csv"
+adata  = []
+mdata  = ["total_energy", "mean_state", "active_cells"]
+[visualization]
+filename          = "output_videos/lenia_noisy.mp4"
+frames            = 400
+framerate         = 30
+title             = "Lenia con perturbacion"
+variable_to_color = "state"
+color_scheme      = "viridis"
+agent_shape       = "rect"
+agent_size        = 1
+```
+(Perturbation is just TOML knobs + model_step="lenia_noisy_step!"; the noisy step is built-in.)

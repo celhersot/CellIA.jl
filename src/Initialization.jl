@@ -158,6 +158,27 @@ function populate_world!(model, config, T)
         return
     end
 
+    # Lenia creature seed ("lenia_<name>", e.g. "lenia_orbium"): stamp a coherent organism
+    # centered on an otherwise empty field so it self-propels across the grid, instead of the
+    # chaotic soup uniform_float produces. The pattern lives in CustomEvolutionRules.LENIA_CREATURES.
+    if startswith(init_rule, "lenia_")
+        name = init_rule[length("lenia_") + 1 : end]
+        haskey(CustomEvolutionRules.LENIA_CREATURES, name) ||
+            error("Criatura de Lenia desconocida: \"$name\". Disponibles: " *
+                  join(sort(collect(keys(CustomEvolutionRules.LENIA_CREATURES))), ", "))
+        seed = CustomEvolutionRules.LENIA_CREATURES[name].cells
+        ph, pw = size(seed)
+        off_x  = (dims[1] - ph) ÷ 2
+        off_y  = (dims[2] - pw) ÷ 2
+        for x in 1:dims[1], y in 1:dims[2]
+            si = x - off_x
+            sj = y - off_y
+            s  = (1 <= si <= ph && 1 <= sj <= pw) ? Float64(seed[si, sj]) : 0.0
+            add_agent!((x, y), model; state = s)
+        end
+        return
+    end
+
     pop_conf    = config["population"]
     total_slots = prod(dims)
     states_to_spawn = []

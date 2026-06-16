@@ -26,18 +26,30 @@ const MODEL_URL  = "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF
 
 const PROMPTS_DIR = joinpath(@__DIR__, "prompts")
 
-# category => (prompt file, expected space.type, whether a _rules.jl is mandatory)
+# category => (prompt file, expected space.type, whether a _rules.jl is mandatory,
+#              canonical human description shown at confirmation time)
+# `desc` is a curated, coherent sentence per category. We show THIS instead of the
+# router's free-form "approach": the 1.5B model often writes contradictory approaches
+# (e.g. "Lenia con cada célula viva o muerta"), which makes a correct category look wrong.
 const CATEGORIES = Dict(
-    "grid_discrete"    => (prompt = "grid_discrete.txt",    space = "grid",       needs_jl = false),
-    "continuous_field" => (prompt = "continuous_field.txt", space = "grid",       needs_jl = false),
-    "continuous_space" => (prompt = "continuous_space.txt", space = "continuous", needs_jl = true),
-    "hexagonal"        => (prompt = "hexagonal.txt",         space = "hexagonal",  needs_jl = true),
+    "grid_discrete"    => (prompt = "grid_discrete.txt",    space = "grid",       needs_jl = false,
+        desc = "Autómata celular en rejilla: cada celda tiene un estado DISCRETO (p.ej. viva/muerta, un color, una especie) y se actualiza según sus vecinas. Las celdas no se mueven. Estilo Juego de la Vida."),
+    "continuous_field" => (prompt = "continuous_field.txt", space = "grid",       needs_jl = false,
+        desc = "Tipo Lenia: una rejilla cuyas celdas guardan un valor CONTINUO en [0,1]; el conjunto forma un organismo que fluye y se desplaza de forma suave sobre la rejilla."),
+    "continuous_space" => (prompt = "continuous_space.txt", space = "continuous", needs_jl = true,
+        desc = "Tipo bandada/boids: MUCHOS agentes se mueven como puntos por un espacio continuo (sin rejilla) y se agrupan según sus vecinos."),
+    "hexagonal"        => (prompt = "hexagonal.txt",         space = "hexagonal",  needs_jl = true,
+        desc = "Modelo sobre rejilla HEXAGONAL (panal), con propiedades por celda. Estilo colmena."),
 )
 
 const BUILTIN_RULES = Set([
     "gol_step!", "rps_step!", "schelling_step!", "default_model_step!",
-    "lenia_model_step!", "lenia_init!",
+    "lenia_model_step!", "lenia_noisy_step!", "lenia_init!",
 ])
+
+# Métricas de NIVEL MODELO (f(model)->escalar). En [run] van SIEMPRE en mdata, nunca en adata
+# (en adata Agents.jl las llamaría por-agente y fallaría).
+const MODEL_METRICS = Set(["total_energy", "mean_state", "active_cells"])
 
 # Read once at load time (the files ship with the framework).
 const ROUTER_GRAMMAR = read(joinpath(PROMPTS_DIR, "router.gbnf"), String)
@@ -185,14 +197,23 @@ end
 
 function confirm_and_select(user_text::String; interactive::Bool = true)
     excluded = String[]
-    desc = user_text
+    clarifications = String[]
+    # Build the routing input from the ORIGINAL request plus any user clarifications,
+    # kept as a labeled list rather than concatenated into one run-on sentence. Appending
+    # corrections to a single string turns successive refinements ("rejilla", "movimiento
+    # continuo") into a self-contradictory blob that confuses the router.
+    build_desc() = isempty(clarifications) ? user_text :
+        user_text * "\n\nAclaraciones del usuario (posteriores y más precisas; mandan sobre la " *
+        "descripción inicial):\n" * join(["- " * c for c in clarifications], "\n")
     for _ in 1:6
+        desc = build_desc()
         r = route(desc; exclude = excluded)
         if !interactive
             println("--> Categoría elegida automáticamente: $(r.category)")
             return (r.category, desc)
         end
-        println("\n--> Propuesta: $(r.approach)")
+        # Show the curated category description, not the router's noisy free-form approach.
+        println("\n--> Propuesta: $(CATEGORIES[r.category].desc)")
         println("    (categoría interna: $(r.category))")
         print("¿Generar con este enfoque? [s / n / o escribe una corrección]: ")
         ans = strip(readline())
@@ -206,7 +227,10 @@ function confirm_and_select(user_text::String; interactive::Bool = true)
                 return nothing
             end
         else
-            desc = desc * " " * ans          # treat as a correction; re-route
+            # Treat as a clarification and re-route WITHOUT excluding the current category:
+            # a correction often just refines details (the right category may stay the same).
+            # Only an explicit "n" rules a category out.
+            push!(clarifications, String(ans))
         end
     end
     println("Demasiados intentos sin confirmar. Cancelando.")
@@ -271,16 +295,102 @@ function validate_files(files::Dict, category::String)
     elseif category == "continuous_field"
         get(agents, "state_type", "") == "Float64" ||
             return (false, "continuous_field requiere state_type=\"Float64\".")
-        get(rules, "model_step", "") == "lenia_model_step!" ||
-            return (false, "continuous_field requiere model_step=\"lenia_model_step!\".")
-        haskey(rules, "post_init") ||
+
+        # model_step: built-in (lenia_model_step! puro | lenia_noisy_step! con ruido) o uno
+        # propio definido en el _rules.jl.
+        ms = get(rules, "model_step", "")
+        isempty(ms) &&
+            return (false, "continuous_field requiere rules.model_step (\"lenia_model_step!\" o \"lenia_noisy_step!\").")
+        if !(ms in BUILTIN_RULES)
+            occursin(Regex("function\\s+\\Q" * ms * "\\E\\s*\\("), jl_str) ||
+                return (false, "model_step=\"$ms\" no existe. NO renombres la función al tema del " *
+                               "organismo: usa EXACTAMENTE \"lenia_model_step!\" (o \"lenia_noisy_step!\" " *
+                               "si hay ruido). Solo define una función propia en el _rules.jl si vas a diseñar una regla nueva.")
+        end
+
+        # post_init: built-in (lenia_init!) o uno propio (p.ej. uno que diseñe la función de
+        # crecimiento G fijando abmproperties(model)[:growth_fn]).
+        pii = get(rules, "post_init", "")
+        isempty(pii) &&
             return (false, "continuous_field requiere rules.post_init (p.ej. \"lenia_init!\").")
+        if !(pii in BUILTIN_RULES)
+            occursin(Regex("function\\s+\\Q" * pii * "\\E\\s*\\("), jl_str) ||
+                return (false, "post_init=\"$pii\" no existe. NO lo renombres al tema del organismo: " *
+                               "usa EXACTAMENTE \"lenia_init!\". Solo define un post_init propio en el " *
+                               "_rules.jl si vas a DISEÑAR una G/kernel nuevos.")
+        end
+
+        # Si model_step o post_init son personalizados, hace falta el _rules.jl.
+        if (!(ms in BUILTIN_RULES) || !(pii in BUILTIN_RULES)) && isempty(jl_str)
+            return (false, "Un model_step/post_init a medida (p.ej. una G diseñada) requiere un _rules.jl.")
+        end
+
+        props = get(cfg, "properties", Dict())
+
+        # Si se usan los steps built-in, las propiedades deben llamarse lenia_mu/lenia_sigma:
+        # lenia_model_step! las lee por esos nombres exactos (model.lenia_mu), así que un
+        # renombrado al tema (organism_mu, …) compila pero peta en ejecución. Lo cazamos aquí.
+        if ms in ("lenia_model_step!", "lenia_noisy_step!")
+            for pk in ("lenia_mu", "lenia_sigma")
+                haskey(props, pk) ||
+                    return (false, "Falta la propiedad [properties].$pk. lenia_model_step! la lee por " *
+                                   "ese nombre EXACTO; no la renombres al tema (p.ej. organism_mu/creature_sigma son inválidas).")
+            end
+        end
+
+        # Una semilla de criatura (lenia_orbium, …) necesita una rejilla amplia para desplazarse.
+        init_rule = get(rules, "initialization_rule", "")
+        if startswith(init_rule, "lenia_") && init_rule != "uniform_float"
+            dims = get(get(cfg, "space", Dict()), "dimensions", Any[])
+            if dims isa AbstractVector && length(dims) == 2 && all(d -> d isa Integer, dims)
+                minimum(dims) >= 64 ||
+                    return (false, "initialization_rule=\"$init_rule\" siembra una criatura que necesita " *
+                                   "sitio para desplazarse: usa [space].dimensions de al menos [64, 64] (mejor [128, 128]).")
+            end
+        end
+
+        # Parámetros de perturbación (opcionales): validar tipo/rango si aparecen.
+        if haskey(props, "sigma_noise")
+            sn = props["sigma_noise"]
+            (sn isa Real && sn >= 0) ||
+                return (false, "sigma_noise debe ser un número ≥ 0 (es $(repr(sn))).")
+        end
+        if haskey(props, "noise_scope")
+            props["noise_scope"] in ("support", "field") ||
+                return (false, "noise_scope debe ser \"support\" o \"field\".")
+        end
+        for nk in ("noise_start_step", "noise_end_step")
+            if haskey(props, nk)
+                (props[nk] isa Integer && props[nk] >= 0) ||
+                    return (false, "$nk debe ser un entero ≥ 0.")
+            end
+        end
+
+        # [run] (run!): las métricas de modelo deben ir en mdata, no en adata.
+        runc = get(cfg, "run", Dict())
+        if !isempty(runc)
+            ad = get(runc, "adata", Any[])
+            misplaced = [m for m in ad if m in MODEL_METRICS]
+            isempty(misplaced) ||
+                return (false, "Las métricas de modelo $(misplaced) deben ir en [run].mdata, NO en adata. " *
+                               "Pon mdata=[\"total_energy\",\"active_cells\"] y deja adata=[].")
+        end
 
     elseif category == "continuous_space"
         (occursin("@agent", jl_str) && occursin("using Agents", jl_str)) ||
             return (false, "continuous_space requiere un .jl con @agent y using Agents.")
         haskey(pop, "pop_quantity") ||
             return (false, "continuous_space requiere population.pop_quantity.")
+
+        # Cada campo `const` del struct @agent se instancia leyéndolo de [agents] por nombre
+        # (ver populate_continuous_world!). id/pos/vel los inyecta @agent automáticamente.
+        # Comprobamos la correspondencia aquí para que el bucle de reparación reciba un
+        # mensaje preciso en vez de fallar solo en ejecución.
+        struct_fields = [m.captures[1] for m in eachmatch(r"const\s+(\w+)\s*::", jl_str)]
+        missing_fields = [f for f in struct_fields if !haskey(agents, f)]
+        isempty(missing_fields) ||
+            return (false, "Cada campo `const` del struct @agent debe tener un valor en [agents] del .toml. " *
+                           "Faltan: $(join(missing_fields, ", ")). Añádelos bajo [agents] (NO declares id/pos/vel).")
 
     elseif category == "hexagonal"
         get(viz, "agent_shape", "") == "hexagon" ||
