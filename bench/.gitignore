@@ -1,0 +1,7 @@
+# Artefactos de build y ejecucion (regenerables con build_c.sh / run_all.py)
+lenia.exe
+*.dll
+*.def
+fftw3.h
+_check_discard.csv
+run_full.log
