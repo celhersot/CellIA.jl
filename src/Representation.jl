@@ -1,5 +1,6 @@
 module Representation
 using CairoMakie
+using ColorTypes: Colorant
 using Agents
 using Random
 using ..HexagonalSpace
@@ -54,6 +55,18 @@ function _build_agent_color_fn(viz_config)
             end
         catch
             raw = agent.state
+        end
+
+        # State that *is* a color: a Colorant, or any struct exposing r/g/b fields.
+        # Generic — lets any model carry a per-agent RGB and render it verbatim
+        # (e.g. the image-tracing painters). Placed before the colormap/Dict logic;
+        # primitive states (Int/Float/Symbol/String/Bool) have no r/g/b properties.
+        if raw isa Colorant
+            return raw
+        elseif hasproperty(raw, :r) && hasproperty(raw, :g) && hasproperty(raw, :b)
+            return RGBf(clamp(Float64(getproperty(raw, :r)), 0.0, 1.0),
+                        clamp(Float64(getproperty(raw, :g)), 0.0, 1.0),
+                        clamp(Float64(getproperty(raw, :b)), 0.0, 1.0))
         end
 
         # Named colormap + numeric state → continuous mapping into [0,1]
@@ -225,6 +238,63 @@ function record_grid_heatmap(model, viz_config)
     end
 end
 
+# ── record_rgb_grid ──────────────────────────────────────────────────────────
+# Grid renderer for agents that carry a per-agent RGB color (color_scheme = "rgb").
+# Each agent paints its own cell; empty cells show the background. The background is
+# either a flat color (background_color, default black) or, when show_target_background
+# is true and the model exposes a :background_image (Matrix of Colorant), that image.
+# This is how the image-tracing model is visualized, but it is generic: any grid model
+# whose agent state encodes a color renders here.
+
+function _compose_rgb_canvas(model, base, colorfn, nx, ny)
+    canvas = copy(base)
+    @inbounds for a in allagents(model)
+        x, y = a.pos
+        if 1 <= x <= nx && 1 <= y <= ny
+            canvas[x, y] = RGBf(colorfn(a))
+        end
+    end
+    return canvas
+end
+
+function _rgb_background(model, viz_config, nx, ny)
+    props = abmproperties(model)
+    if get(viz_config, "show_target_background", false) && haskey(props, :background_image)
+        return RGBf.(props[:background_image])
+    end
+    c = Makie.to_color(get(viz_config, "background_color", "black"))
+    return fill(convert(RGBf, c), nx, ny)
+end
+
+function record_rgb_grid(model, viz_config)
+    dims   = size(abmspace(model))
+    nx, ny = dims
+    frames = get(viz_config, "frames",    200)
+    fps    = get(viz_config, "framerate",  20)
+    title  = get(viz_config, "title", "Simulation")
+    output = viz_config["filename"]
+
+    colorfn = _build_agent_color_fn(viz_config)
+    base    = _rgb_background(model, viz_config, nx, ny)
+    canvas  = Observable(_compose_rgb_canvas(model, base, colorfn, nx, ny))
+
+    fig = Figure(size = (640, 640), backgroundcolor = :black)
+    ax  = Axis(fig[1, 1]; aspect = DataAspect(), backgroundcolor = :black,
+               title = title, titlecolor = :white)
+    hidedecorations!(ax)
+    hidespines!(ax)
+    image!(ax, canvas; interpolate = false)
+
+    dir = dirname(output)
+    !isempty(dir) && mkpath(dir)
+    println("Recording $frames frames → $output ...")
+    record(fig, output, 1:frames; framerate = fps) do _
+        step!(model, 1)
+        canvas[] = _compose_rgb_canvas(model, base, colorfn, nx, ny)
+    end
+    println("Saved: $output")
+end
+
 # ── video_simulation ───────────────────────────────────────────────────────────
 
 function video_simulation(model, viz_config, space_config)
@@ -233,8 +303,17 @@ function video_simulation(model, viz_config, space_config)
         return
     end
 
-    # Grid + named colormap → heatmap rendering (e.g. Lenia)
     color_scheme = get(viz_config, "color_scheme", nothing)
+
+    # Grid + per-agent RGB color (each agent paints its own cell). Checked before the
+    # heatmap branch because "rgb" is also a plain (non-"#") string.
+    if space_config["type"] == "grid" &&
+            isa(color_scheme, AbstractString) && lowercase(color_scheme) == "rgb"
+        record_rgb_grid(model, viz_config)
+        return
+    end
+
+    # Grid + named colormap → heatmap rendering (e.g. Lenia)
     if space_config["type"] == "grid" &&
             isa(color_scheme, AbstractString) && !startswith(color_scheme, "#")
         record_grid_heatmap(model, viz_config)
@@ -267,6 +346,26 @@ end
 function photo_simulation(model, viz_config, space_config,
                           output_path::Union{String, Nothing}=nothing)
     color_scheme = get(viz_config, "color_scheme", nothing)
+
+    # Grid + per-agent RGB color → single composed canvas (mirrors record_rgb_grid).
+    if space_config["type"] == "grid" &&
+            isa(color_scheme, AbstractString) && lowercase(color_scheme) == "rgb"
+        nx, ny  = size(abmspace(model))
+        colorfn = _build_agent_color_fn(viz_config)
+        base    = _rgb_background(model, viz_config, nx, ny)
+        canvas  = _compose_rgb_canvas(model, base, colorfn, nx, ny)
+        fig = Figure(size = (640, 640), backgroundcolor = :black)
+        ax  = Axis(fig[1, 1]; aspect = DataAspect(), backgroundcolor = :black,
+                   title = get(viz_config, "title", "Simulation"), titlecolor = :white)
+        hidedecorations!(ax); hidespines!(ax)
+        image!(ax, canvas; interpolate = false)
+        if !isnothing(output_path)
+            dir = dirname(output_path); !isempty(dir) && mkpath(dir)
+            save(output_path, fig)
+            println("Saved photo: $output_path")
+        end
+        return fig
+    end
 
     # Use heatmap for grid spaces whose state is a float, regardless of whether
     # color_scheme is set (default to "viridis" when not specified).

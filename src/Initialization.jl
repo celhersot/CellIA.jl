@@ -149,6 +149,13 @@ function populate_world!(model, config, T)
     dims      = size(abmspace(model))
     init_rule = get(config["rules"], "initialization_rule", "random")
 
+    # No automatic population: the model spawns its own agents later (e.g. in post_init).
+    # Useful for models whose state is a custom struct that cannot be derived from a
+    # [population] density/quantity table (e.g. agents with random RGB colors).
+    if init_rule == "empty"
+        return
+    end
+
     # Fill every cell with a uniform random float in [0,1].
     # Does not require a [population] section in the TOML.
     if init_rule == "uniform_float"

@@ -1,0 +1,16 @@
+Profiling Cell_IA — lenia_model_step! — 256x256 — árbol de llamadas
+
+Overhead ╎ [+additional indent] Count File:Line; Function
+=========================================================
+   ╎6188 @Base\client.jl:531; _start()
+   ╎ 6188 @Base\client.jl:323; exec_options(opts::Base.JLOptions)
+   ╎  6188 @Base\Base.jl:562; include(mod::Module, _path::String)
+   ╎   6188 @Base\loading.jl:2794; _include(mapexpr::Function, mod::Module, _pa…
+   ╎    6188 @Base\loading.jl:2734; include_string(mapexpr::typeof(identity), m…
+   ╎     6188 @Base\boot.jl:430; eval
+   ╎    ╎ 6188 …ch\profile_lenia.jl:124; main()
+   ╎    ╎  6188 …file\src\Profile.jl:58; macro expansion
+   ╎    ╎   6188 …ns\step_standard.jl:5; step!(model::StandardABM{GridSpaceSing…
+   ╎    ╎    6187 …ns\step_standard.jl:26; step_ahead!
+   ╎    ╎     6183 …mEvolutionRules.jl:204; lenia_model_step!(model::StandardAB…
+Total snapshots: 6188. Utilization: 100% across all threads and tasks. Use the `groupby` kwarg to break down by thread and/or task.

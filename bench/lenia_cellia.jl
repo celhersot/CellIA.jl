@@ -33,6 +33,9 @@ FFTW.set_num_threads(1)
 
 const RESULTS = get(ENV, "BENCH_RESULTS", joinpath(@__DIR__, "results.csv"))
 const PHOTODIR = joinpath(@__DIR__, "photos")
+# Step a medir: "lenia_model_step!" (optimizado, por defecto) o "lenia_model_step_legacy!"
+const CELLIA_STEP = get(ENV, "BENCH_CELLIA_STEP", "lenia_model_step!")
+const CELLIA_LANG = CELLIA_STEP == "lenia_model_step_legacy!" ? "cell_ia_legacy" : "cell_ia"
 
 # Config del modelo Cell_IA para una rejilla dada (mismo orbium/parametros que organismo.toml).
 function make_config(dims::Int)
@@ -46,7 +49,7 @@ function make_config(dims::Int)
                              "kernel_radius" => 13, "kernel_type" => "gaussian"),
         "rules"      => Dict("initialization_rule" => "lenia_orbium",
                              "post_init" => "lenia_init!",
-                             "model_step" => "lenia_model_step!"),
+                             "model_step" => CELLIA_STEP),
     )
 end
 
@@ -143,7 +146,7 @@ function main()
     reps   = parse(Int, get(ENV, "BENCH_REPS",   string(quick ? 2 : 10)))
 
     seed = read_seed(joinpath(@__DIR__, "orbium_seed.txt"))
-    println("== Cell_IA (Agents.jl + FFTW) | hilos=$(FFTW.get_num_threads()) | steps=$steps reps=$reps ==")
+    println("== Cell_IA ($CELLIA_STEP) | hilos=$(FFTW.get_num_threads()) | steps=$steps reps=$reps ==")
     for dims in grids
         ms, Efin, mfin = run_grid(dims, seed, steps, warmup, reps)
         med = median(ms); sd = length(ms) > 1 ? std(ms) : 0.0
@@ -152,8 +155,8 @@ function main()
                 dims, dims, med, sd, total, Efin, mfin)
         open(RESULTS, "a") do io
             for (rep, v) in enumerate(ms)
-                @printf(io, "cell_ia,Agents.jl+FFTW,CPU,%d,%d,%.6f,%.6f,%.9f,%.9f\n",
-                        dims, rep, v, v * steps / 1000, Efin, mfin)
+                @printf(io, "%s,Agents.jl+FFTW,CPU,%d,%d,%.6f,%.6f,%.9f,%.9f\n",
+                        CELLIA_LANG, dims, rep, v, v * steps / 1000, Efin, mfin)
             end
         end
     end

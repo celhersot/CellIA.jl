@@ -114,9 +114,11 @@ const LENIA_CREATURES = Dict(
                  dt = 0.1, kernel_radius = 13, kernel_type = "gaussian"),
 )
 
-# _lenia_build_kernel! — precomputes the spatial kernel and stores its FFT.
-# Called from lenia_init!; also callable from user-defined post_init functions
-# after setting abmproperties(model)[:kernel_fn].
+# _lenia_build_kernel! — precomputa el kernel y TODO el estado de trabajo reutilizable que
+# necesita el update: el rfft del kernel, los planes FFTW reales (MEASURE) y los buffers
+# (A, Â, U). Así no se replanifica ni se reasigna memoria en cada paso. Lo llama lenia_init!
+# (post_init) o, en su defecto, el primer lenia_model_step! de forma perezosa.
+# Se mantiene :kernel_fft (FFT compleja) por compatibilidad con código que lo lea (p.ej. legacy).
 function _lenia_build_kernel!(model)
     dims = size(abmspace(model))
     R    = Int(get(abmproperties(model), :kernel_radius, 13))
@@ -132,44 +134,91 @@ function _lenia_build_kernel!(model)
 
     s = sum(K)
     s > 0.0 && (K ./= s)
-    abmproperties(model)[:kernel_fft] = fft(K)
+
+    props = abmproperties(model)
+    props[:kernel_fft] = fft(K)                          # compatibilidad (lectura externa / legacy)
+
+    # --- estado optimizado: FFT real + planes + buffers reutilizables ---
+    Khat = rfft(K)                                       # rfft del kernel (una sola vez)
+    A    = zeros(Float64, dims...)                       # buffer de campo (se rellena cada paso)
+    Ahat = similar(Khat)                                 # buffer espectral
+    U    = Matrix{Float64}(undef, dims...)               # buffer de convolución
+    pf   = plan_rfft(A; flags = FFTW.MEASURE)            # r2c (planificar sobrescribe A; se rellena luego)
+    pb   = plan_brfft(Ahat, dims[1]; flags = FFTW.MEASURE)  # c2r sin normalizar (la 1/N va aparte)
+    props[:_lenia_state] = (A = A, U = U, Ahat = Ahat, Khat = Khat,
+                            pf = pf, pb = pb, invN = 1.0 / (dims[1] * dims[2]))
+    return nothing
 end
 
-# lenia_init! — default post_init hook.
-# Builds the kernel FFT from abmproperties(model)[:kernel_fn] (or the default).
-# State randomisation is handled separately via initialization_rule = "uniform_float".
+# lenia_init! — post_init por defecto. Construye el kernel y el estado de trabajo.
 function lenia_init!(model)
     kernel_type = string(get(abmproperties(model), :kernel_type, "gaussian"))
     if kernel_type == "polynomial"
         abmproperties(model)[:kernel_fn] = (r::Float64) -> max(0.0, 1.0 - r^2)^4
     end
-    # kernel_type == "custom" → user already set abmproperties(model)[:kernel_fn] earlier
+    # kernel_type == "custom" → el usuario ya fijó abmproperties(model)[:kernel_fn] antes
     _lenia_build_kernel!(model)
 end
 
-# lenia_model_step! — full synchronous update via FFT convolution.
-# Does NOT use next_states; reads A first, writes back after, so update is coherent.
-function lenia_model_step!(model)
-    dims = size(abmspace(model))
+# _lenia_run_step! — núcleo de un paso AISLADO en una función con tipos concretos
+# (barrera de tipos): los buffers/planes salen del Dict{Symbol,Any} como `Any`, pero al
+# pasarlos aquí el compilador especializa y todo el bucle caliente queda type-stable y
+# sin allocaciones intermedias.
+function _lenia_run_step!(model, st, μ::Float64, σ::Float64, dt::Float64, gfn::F) where {F}
+    A, U, Ahat, Khat = st.A, st.U, st.Ahat, st.Khat
+    pf, pb, invN     = st.pf, st.pb, st.invN
 
-    # 1. Snapshot current state into a matrix
+    # 1. snapshot agentes -> A (campo real)
+    fill!(A, 0.0)
+    @inbounds for a in allagents(model)
+        A[a.pos[1], a.pos[2]] = a.state
+    end
+
+    # 2. convolución circular por FFT real:  U = irfft( rfft(A) .* rfft(K) )
+    mul!(Ahat, pf, A)                       # Â = rfft(A)
+    @inbounds @. Ahat = Ahat * Khat         # multiplicación en frecuencia (in-place)
+    mul!(U, pb, Ahat)                       # U = brfft(Â)  (sin normalizar; la 1/N va en invN)
+
+    # 3. crecimiento + clamp, fusionado e in-place sobre A
+    @inbounds @. A = clamp(A + dt * gfn(U * invN, μ, σ), 0.0, 1.0)
+
+    # 4. escribir el nuevo estado de vuelta a los agentes
+    @inbounds for a in allagents(model)
+        a.state = A[a.pos[1], a.pos[2]]
+    end
+    return nothing
+end
+
+# lenia_model_step! — update síncrono OPTIMIZADO (FFT real + planes/buffers cacheados +
+# barrera de tipos). Misma semántica y firma que la versión original: cualquier TOML que
+# use "lenia_model_step!" se acelera sin tocar nada. La versión original se conserva como
+# lenia_model_step_legacy! (abajo) para comparativas de rendimiento.
+function lenia_model_step!(model)
+    props = abmproperties(model)
+    haskey(props, :_lenia_state) || _lenia_build_kernel!(model)   # init perezoso si no hubo post_init
+    st  = props[:_lenia_state]
+    μ   = Float64(props[:lenia_mu])
+    σ   = Float64(props[:lenia_sigma])
+    dt  = Float64(props[:dt])
+    gfn = get(props, :growth_fn, _lenia_growth_fn)
+    _lenia_run_step!(model, st, μ, σ, dt, gfn)               # barrera de tipos
+end
+
+# lenia_model_step_legacy! — versión original (FFT compleja, sin planes ni buffers, con
+# inestabilidad de tipos por el Dict de propiedades). Se conserva SOLO para comparar
+# rendimiento (ver bench/); no debe usarse en producción.
+function lenia_model_step_legacy!(model)
+    dims = size(abmspace(model))
     A = zeros(Float64, dims...)
     for agent in allagents(model)
         A[agent.pos[1], agent.pos[2]] = agent.state
     end
-
-    # 2. U = K ⊛ A  (circular convolution via FFT)
     U = real(ifft(fft(A) .* model.kernel_fft))
-
-    # 3. Apply growth function element-wise and clamp
     μ   = Float64(model.lenia_mu)
     σ   = Float64(model.lenia_sigma)
     dt  = Float64(model.dt)
     gfn = get(abmproperties(model), :growth_fn, _lenia_growth_fn)
-
     A_new = clamp.(A .+ dt .* gfn.(U, μ, σ), 0.0, 1.0)
-
-    # 4. Write new states back to agents
     for agent in allagents(model)
         agent.state = A_new[agent.pos[1], agent.pos[2]]
     end

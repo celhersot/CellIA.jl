@@ -109,4 +109,29 @@ python bench/run_all.py --table-only    # regenerar la tabla desde results.csv
 
 Salidas: [`results.csv`](results.csv) (datos crudos), [`results_table.md`](results_table.md)
 (tabla agregada), [`photos/`](photos) (estado inicial/final de Cell_IA), [`run_full.log`](run_full.log)
-(traza completa con los veredictos de GPU).
+(traza completa con los veredictos de GPU), [`results_v1_legacy.csv`](results_v1_legacy.csv)
+(baseline previo a la optimización del motor).
+
+## Optimización del motor (rama T06)
+
+El benchmark reveló que Cell_IA era ~8–10x más lento que Julia puro. El análisis mostró que el
+coste NO estaba en la FFT (ya es C vía FFTW.jl) sino en: planes FFTW no cacheados, allocaciones
+por paso, inestabilidad de tipos del `Dict{Symbol,Any}` y el marshaling agente↔array. Se optimizó
+`lenia_model_step!` **sin cambiar la estructura ni la API** (mismo nombre, mismo TOML, misma
+semántica; la versión original se conserva como `lenia_model_step_legacy!`):
+
+- **FFT real** (`rfft`/`brfft`) en lugar de compleja (la mitad de trabajo y memoria).
+- **Planes FFTW (`MEASURE`) y buffers preasignados** cacheados en `post_init`, reutilizados cada paso.
+- **Barrera de tipos** (`_lenia_run_step!` con argumentos concretos) que elimina el dynamic dispatch.
+- **Broadcasts fusionados e in-place** (`mul!`, `@.`, `@inbounds`) → cero allocaciones intermedias.
+
+Resultado (mediana ms/step, 1000 pasos, 1 hilo; `E` idéntica → equivalencia numérica verificada):
+
+| | 128² | 256² | 512² |
+|---|---|---|---|
+| Cell_IA legacy | 5.842 | 30.633 | 147.659 |
+| **Cell_IA optimizado** | **1.854** | **7.968** | **51.168** |
+| mejora | 3.15x | 3.84x | 2.89x |
+
+Cell_IA pasó de ~8–10x a ~2.3–3.5x respecto a Julia puro; el residual es el coste estructural del
+paradigma ABM (volcar/reescribir 262 144 agentes por paso), que no se toca por diseño.

@@ -1,0 +1,178 @@
+Profiling Cell_IA — lenia_model_step_legacy! — 256x256 — 255 pasos — 138209 muestras
+Formato plano (C=false): solo frames de Julia. 'Count' = nº de muestras
+cuya pila contiene esa línea (inclusivo).
+
+ Count  Overhead File                    Line Function
+ =====  ======== ====                    ==== ========
+     1         1 @Base\array.jl             ? macro expansion
+     1         1 @Base\int.jl             372 |
+     1         1 …stomEvolutionRules.jl   219 lenia_model_step_legacy!(model::S…
+     1         1 @Base\dict.jl              ? iterate
+     1         0 @Base\complex.jl         343 *
+     1         1 @Base\intfuncs.jl          ? copy
+     1         0 @FFTW\src\fft.jl         373 maybe_destroy_plan(plan::FFTW.cFF…
+     1         1 @FFTW\src\fft.jl         324 unsafe_destroy_plan
+     1         1 @Base\simdloop.jl          ? macro expansion
+     1         1 @Base\float.jl           619 <=
+     1         0 @Base\special\exp.jl     179 table_unpack
+     1         0 @Base\int.jl            1013 &
+     1         0 @FFTW\src\fft.jl         371 maybe_destroy_plan(plan::FFTW.cFF…
+     1         1 @Base\lock.jl              ? trylock
+     2         2 @Base\special\exp.jl     180 table_unpack
+     2         0 @Base\special\exp.jl     214 exp_impl
+     2         2 @Base\int.jl             527 >>
+     2         2 @Base\abstractarray.jl   697 checkbounds
+     2         0 @Base\special\exp.jl     181 table_unpack
+     2         0 @Base\special\exp.jl     230 exp_impl
+     2         0 @Base\special\exp.jl     209 exp_impl
+     3         3 @Base\Base.jl              ? setproperty!(x::Main.UniversalAge…
+     3         3 @Base\int.jl             513 <
+     3         3 @Base\int.jl             347 &
+     3         3 @Base\int.jl             528 >>
+     3         0 @Base\special\exp.jl     213 exp_impl
+     4         4 @Base\float.jl           494 /
+     4         0 @Base\math.jl             94 evalpoly
+     4         0 @Base\math.jl             95 macro expansion
+     4         4 @Base\int.jl              88 *
+     4         4 @Base\essentials.jl      730 reinterpret
+     4         0 @Base\range.jl           904 iterate
+     4         0 @Base\range.jl           681 isempty
+     5         5 @Base\float.jl           692 abs
+     5         0 …stomEvolutionRules.jl   212 lenia_model_step_legacy!(model::S…
+     5         0 @Base\array.jl           585 zeros
+     5         0 @Base\array.jl           589 zeros
+     5         0 @Base\int.jl             534 >>
+     5         0 @Base\simdloop.jl         75 macro expansion
+     5         0 @Base\array.jl           929 getindex(::Matrix{Float64}, ::Int…
+     5         0 @Base\special\exp.jl     216 exp_impl
+     5         0 @Base\special\exp.jl      78 expm1b_kernel
+     5         0 @Base\dict.jl            134 isslotfilled
+     5         0 @Base\operators.jl       277 !=
+     5         0 @Base\int.jl             518 ==
+     5         0 @Base\promotion.jl       483 ==
+     6         0 @Base\operators.jl       426 >=
+     6         6 @Base\int.jl             514 <=
+     6         0 @Base\special\exp.jl     182 table_unpack
+     6         6 @Base\float.jl           489 -
+     7         1 @Base\special\exp.jl     218 exp_impl
+     8         0 @Base\range.jl             5 Colon
+     8         0 @Base\range.jl           408 UnitRange
+     8         2 @Base\range.jl           419 unitrange_last
+     9         9 @Base\int.jl              83 <
+     9         9 @Base\float.jl           496 muladd
+    10        10 @Base\int.jl              87 +
+    10         0 @FFTW\src\fft.jl         774 plan_fft
+    10         0 @FFTW\src\fft.jl         784 #plan_fft#10
+    10        10 @Base\array.jl           987 setindex!
+    11         0 @Base\special\exp.jl     215 exp_impl
+    11        11 @Base\array.jl           927 getindex(::Matrix{Float64}, ::Int…
+    11        11 @Base\float.jl           492 -
+    12         0 @Base\dict.jl            684 skip_deleted
+    12         0 @Base\broadcast.jl       223 similar
+    12         0 @Base\broadcast.jl       224 similar
+    12         0 @Base\abstractarray.jl   867 similar
+    12         0 @Base\abstractarray.jl   868 similar
+    13         0 …Ts\src\definitions.jl   282 plan_ifft
+    13         0 …Ts\src\definitions.jl   282 #plan_ifft#19
+    13         0 @FFTW\src\fft.jl         774 plan_bfft
+    13         0 @FFTW\src\fft.jl         784 #plan_bfft#21
+    14         0 @Base\complex.jl         299 *
+    14         0 @Base\abstractarray.jl  1347 _to_linear_index
+    14         0 @Base\abstractarray.jl  3048 _sub2ind
+    14         0 @Base\abstractarray.jl  3064 _sub2ind
+    14         0 @Base\abstractarray.jl  3080 _sub2ind_recurse
+    16         0 …\abstractarraymath.jl   171 real(A::Matrix{ComplexF64})
+    16         0 @Base\broadcast.jl       861 broadcast_preserving_zero_d
+    16         0 @Base\broadcast.jl       872 materialize
+    16        16 @Base\float.jl           491 +
+    16         0 …lgebra\src\generic.jl   188 rmul!
+    16         0 …lgebra\src\generic.jl   189 macro expansion
+    20         0 @Base\dict.jl            714 iterate
+    23         0 @FFTW\src\FFTW.jl         90 (FFTW.cFFTWPlan{ComplexF64, 1, fa…
+    23        23 @FFTW\src\fft.jl         654 macro expansion
+    27        27 @Base\int.jl              86 -
+    27        27 @Base\float.jl           493 *
+    30         0 @Base\abstractarray.jl   681 checkbounds
+    30         0 @Base\abstractarray.jl   725 checkbounds_indices
+    30         0 @Base\abstractarray.jl   754 checkindex
+    30        30 @Base\Base.jl             50 setproperty!(x::Main.UniversalAge…
+    31         0 @Base\intfuncs.jl       1268 clamp
+    31        31 @Base\float.jl           618 <
+    33         0 @Base\array.jl           993 setindex!
+    34         0 @Base\broadcast.jl       644 _broadcast_getindex
+    34         0 …e\multidimensional.jl   702 getindex
+    34         0 @Base\array.jl           930 getindex
+    34        34 @Base\essentials.jl      917 getindex
+    34         0 @Base\dict.jl            688 skip_deleted
+    34        24 @Base\range.jl           908 iterate
+    35         0 @Base\operators.jl       379 >
+    36         6 @Base\abstractarray.jl   699 checkbounds
+    39        39 @Base\genericmemory.jl   245 setindex!
+    39        34 @Base\dict.jl            685 skip_deleted
+    40         6 @Base\dict.jl            711 iterate
+    44         0 @Base\dict.jl            713 iterate
+    46         0 …Ts\src\definitions.jl    54 copy1(::Type{ComplexF64}, x::Matr…
+    46         0 …e\multidimensional.jl  1303 circcopy!
+    46         0 @Base\array.jl           319 copyto!
+    46         0 @Base\array.jl           294 copyto!
+    46         0 @Base\array.jl           308 _copyto_impl!
+    46         0 @Base\genericmemory.jl   133 unsafe_copyto!
+    46         0 @Base\genericmemory.jl   153 unsafe_copyto!(dest::Memory{Compl…
+    46        14 @Base\special\exp.jl     329 exp(x::Float64)
+    56         0 …e\multidimensional.jl   704 setindex!
+    60         0 …Ts\src\definitions.jl    53 copy1(::Type{ComplexF64}, x::Matr…
+    63        57 @Base\array.jl           994 setindex!
+    69         3 …stomEvolutionRules.jl    74 _lenia_growth_fn
+    76         0 @FFTW\src\fft.jl         830 *(p::FFTW.cFFTWPlan{ComplexF64, 1…
+    85         0 @Base\dict.jl            712 iterate
+    88         0 …stomEvolutionRules.jl   215 lenia_model_step_legacy!(model::S…
+    95        95 @Base\promotion.jl       639 ==
+    98         0 @Base\broadcast.jl       675 _getindex
+   106         0 …Ts\src\definitions.jl    47 complexfloat
+   127         0 @Base\broadcast.jl       674 _getindex
+   131         0 @Base\broadcast.jl       650 _broadcast_getindex
+   142         0 @Base\broadcast.jl       651 _broadcast_getindex
+   142         0 @Base\broadcast.jl       678 _broadcast_getindex_evalf
+   148         0 @Base\boot.jl            599 Array
+   153         0 @Base\boot.jl            592 Array
+   153         0 @Base\boot.jl            582 Array
+   153         0 @Base\boot.jl            535 new_as_memoryref
+   153       150 @Base\boot.jl            516 GenericMemory
+   160         1 …stomEvolutionRules.jl   221 lenia_model_step_legacy!(model::S…
+   165       165 @Base\essentials.jl      399 getindex
+   165       165 @Base\Base.jl             51 setproperty!(x::Main.UniversalAge…
+   174        14 @Base\dict.jl            715 iterate
+   176         0 @Base\broadcast.jl       610 getindex
+   215         0 …stomEvolutionRules.jl   214 lenia_model_step_legacy!(model::S…
+   217       217 @Base\Base.jl             52 setproperty!(x::Main.UniversalAge…
+   232         0 @Base\broadcast.jl       973 macro expansion
+   236         0 @Base\broadcast.jl       872 materialize(bc::Base.Broadcast.Br…
+   239         0 @Base\broadcast.jl       925 copyto!
+   239         0 @Base\broadcast.jl       972 copyto!
+   249         0 @Base\simdloop.jl         77 macro expansion
+   251         0 @Base\broadcast.jl       897 copy
+   261         0 …Ts\src\definitions.jl    67 fft
+   262       257 @Base\array.jl           930 getindex(::Matrix{Float64}, ::Int…
+   273         0 …Ts\src\definitions.jl   269 *
+   276         0 …stomEvolutionRules.jl   224 lenia_model_step_legacy!(model::S…
+   286         0 …Ts\src\definitions.jl    66 ifft(x::Matrix{ComplexF64})
+   286         0 …Ts\src\definitions.jl    67 ifft(x::Matrix{ComplexF64}, regio…
+   367         0 …Ts\src\definitions.jl    66 fft
+   367         0 …Ts\src\definitions.jl   214 fft
+   432         0 @FFTW\src\fft.jl         831 *(p::FFTW.cFFTWPlan{ComplexF64, 1…
+   432       432 @FFTW\src\fft.jl         520 unsafe_execute!
+   463       463 @Base\Base.jl             53 setproperty!(x::Main.UniversalAge…
+   747         1 …stomEvolutionRules.jl   216 lenia_model_step_legacy!(model::S…
+   926       926 @Base\Base.jl             49 getproperty
+  2736       851 …stomEvolutionRules.jl   223 lenia_model_step_legacy!(model::S…
+  4228         0 @Base\client.jl          531 _start()
+  4228         0 @Base\client.jl          323 exec_options(opts::Base.JLOptions)
+  4228         0 @Base\Base.jl            562 include(mod::Module, _path::Strin…
+  4228         0 @Base\loading.jl        2794 _include(mapexpr::Function, mod::…
+  4228         0 @Base\loading.jl        2734 include_string(mapexpr::typeof(id…
+  4228         0 @Base\boot.jl            430 eval
+  4228         0 …ench\profile_lenia.jl   124 main()
+  4228         0 …rofile\src\Profile.jl    58 macro expansion
+  4228         0 …ions\step_standard.jl     5 step!(model::StandardABM{GridSpac…
+  4228         0 …ions\step_standard.jl    26 step_ahead!
+Total snapshots: 4230. Utilization: 100% across all threads and tasks. Use the `groupby` kwarg to break down by thread and/or task.
