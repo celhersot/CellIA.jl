@@ -112,7 +112,7 @@ function initialize_model(config::Dict)
 end
 
 function populate_continuous_world!(model, config, T)
-    println("---> Populating...")
+    println("Poblando el mundo...")
     agents_conf = config["agents"]
     pop_conf    = config["population"]
 
@@ -145,19 +145,16 @@ function populate_continuous_world!(model, config, T)
 end
 
 function populate_world!(model, config, T)
-    println("---> Populating...")
+    println("Poblando el mundo...")
     dims      = size(abmspace(model))
     init_rule = get(config["rules"], "initialization_rule", "random")
 
-    # No automatic population: the model spawns its own agents later (e.g. in post_init).
-    # Useful for models whose state is a custom struct that cannot be derived from a
-    # [population] density/quantity table (e.g. agents with random RGB colors).
+    # No genera agentes; el modelo los siembra en post_init (p.ej. estado struct propio).
     if init_rule == "empty"
         return
     end
 
-    # Fill every cell with a uniform random float in [0,1].
-    # Does not require a [population] section in the TOML.
+    # Un float aleatorio en [0,1] por celda (no necesita [population]).
     if init_rule == "uniform_float"
         for x in 1:dims[1], y in 1:dims[2]
             add_agent!((x, y), model; state = rand(abmrng(model)))
@@ -165,9 +162,7 @@ function populate_world!(model, config, T)
         return
     end
 
-    # Lenia creature seed ("lenia_<name>", e.g. "lenia_orbium"): stamp a coherent organism
-    # centered on an otherwise empty field so it self-propels across the grid, instead of the
-    # chaotic soup uniform_float produces. The pattern lives in CustomEvolutionRules.LENIA_CREATURES.
+    # Semilla de criatura Lenia ("lenia_<name>"): estampa el patron centrado en el campo.
     if startswith(init_rule, "lenia_")
         name = init_rule[length("lenia_") + 1 : end]
         haskey(CustomEvolutionRules.LENIA_CREATURES, name) ||

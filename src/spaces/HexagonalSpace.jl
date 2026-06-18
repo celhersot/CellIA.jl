@@ -26,7 +26,7 @@ end
 
 Base.size(space::HexagonalGridSpace) = space.dims
 
-# ── Agents.jl interface ────────────────────────────────────────────────────────
+# --- Interfaz de Agents.jl ---
 
 function Agents.random_position(model::ABM{<:HexagonalGridSpace})
     q = rand(abmrng(model), 1:abmspace(model).dims[1])
@@ -80,7 +80,7 @@ end
 
 Agents.agents_space_dimensionality(::HexagonalGridSpace) = 2
 
-# ── Geometry helpers (no Makie dependency — return plain float tuples) ─────────
+# --- Geometria (sin dependencia de Makie: devuelve tuplas de floats) ---
 
 function hex_to_pixel(row::Int, col::Int, size::Float64 = HEX_SIZE)
     offset = (row % 2 == 1) ? 0.5 : 0.0

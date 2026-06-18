@@ -1,19 +1,9 @@
-# Experimento: resiliencia y estabilidad de Lenia bajo perturbaciones estocásticas.
-#
-# Este archivo contiene lo ESPECÍFICO del experimento: el biomorfo concreto (orbium) que se
-# siembra como estructura estable a perturbar. El resto —el paso de Lenia con ruido opcional
-# (lenia_noisy_step!) y las métricas (total_energy, mean_state, active_cells)— son built-ins
-# GENÉRICOS del framework (src/CustomEvolutionRules.jl), reutilizables por cualquier modelo de
-# campo continuo. Aquí solo va lo que sí es propio de este experimento.
-#
-# main.jl inyecta este archivo en CustomEvolutionRules (Base.include), por lo que lenia_init!
-# y demás built-ins están disponibles directamente.
+# Reglas del experimento de resiliencia de Lenia: solo lo propio de este caso (la semilla
+# del orbium). El paso con ruido (lenia_noisy_step!) y las metricas son built-ins genericos
+# de CustomEvolutionRules.jl, donde main.jl inyecta este archivo.
 
-# ── Patrón canónico "orbium" (Bert Chan, "Lenia: Biology of Artificial Life") ──────────
-# Solución estable (planeador que conserva su masa) bajo los parámetros por defecto del
-# framework, que coinciden con los del orbium: μ=0.15, σ=0.015, R=13, dt=0.1, kernel gaussiano
-# K(r)=exp(4 - 1/(r(1-r))). Sembrarlo garantiza que existe una estructura estable que perturbar
-# (requisito de la Fase 3). Valores de cada celda en [0,1], 20×20.
+# Orbium (Bert Chan): planeador estable con los parametros por defecto (mu=0.15, sigma=0.015,
+# R=13, dt=0.1, kernel gaussiano). Da una estructura estable que perturbar. Celdas en [0,1], 20x20.
 const _ORBIUM = [
 0.0  0.0  0.0  0.0  0.0  0.0  0.10 0.14 0.10 0.0  0.0  0.03 0.03 0.0  0.0  0.30 0.0  0.0  0.0  0.0 ;
 0.0  0.0  0.0  0.0  0.0  0.08 0.24 0.30 0.30 0.18 0.14 0.15 0.16 0.15 0.09 0.20 0.0  0.0  0.0  0.0 ;

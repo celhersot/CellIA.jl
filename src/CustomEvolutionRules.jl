@@ -61,29 +61,18 @@ function schelling_step!(agent, model)
     end
 end
 
-# --- LENIA (Continuous Cellular Automata via FFT convolution) ---
-#
-# Default kernel: smooth bump (Gaussian-like) used in canonical Lenia.
-# Default growth: bell curve centered at μ, width σ.
-# Both can be overridden per-simulation by storing functions in abmproperties(model):
-#   abmproperties(model)[:kernel_fn] = r -> <your kernel>    (r ∈ [0,1])
-#   abmproperties(model)[:growth_fn] = (u,μ,σ) -> <your growth>
+# --- LENIA (automata celular continuo por convolucion FFT) ---
+# Kernel y crecimiento gaussianos por defecto; se pueden sobreescribir por simulacion
+# fijando abmproperties(model)[:kernel_fn] y/o [:growth_fn].
 
 _lenia_kernel_fn(r::Float64) = r < 1.0 ? exp(4.0 - 1.0 / (r * (1.0 - r) + 1e-10)) : 0.0
 
 _lenia_growth_fn(u::Float64, μ::Float64, σ::Float64) =
     2.0 * exp(-((u - μ)^2) / (2.0 * σ^2)) - 1.0
 
-# ── LENIA CREATURES (seed patterns for self-propelling organisms) ────────────────
-# initialization_rule="uniform_float" seeds random noise → a chaotic, boiling "soup".
-# A CREATURE is a small float pattern, tuned to specific Lenia parameters, that when
-# stamped on an otherwise empty field yields a COHERENT organism that GLIDES across the
-# grid — the classic Lenia visual the default kernel was designed for.
-# Use via initialization_rule="lenia_<name>" (e.g. "lenia_orbium"). Each entry lists the
-# recommended μ/σ/dt/R/kernel so the matching TOML [properties] reproduce the right motion.
-#
-# Orbium (Bert Chan, 2019): the canonical gliding organism. 20×20 seed; works with the
-# default gaussian kernel (exp(4-1/(r(1-r)))) and growth bell. Glides smoothly and steadily.
+# Patrones semilla: estampados en un campo vacio dan un organismo coherente que planea.
+# Se usan con initialization_rule="lenia_<name>" (p.ej. "lenia_orbium"); cada entrada trae
+# sus parametros recomendados. Orbium (Bert Chan, 2019): planeador canonico, semilla 20x20.
 const _ORBIUM_CELLS = [
 [0,0,0,0,0,0,0.1,0.14,0.1,0,0,0.03,0.03,0,0,0.3,0,0,0,0],
 [0,0,0,0,0,0.08,0.24,0.3,0.3,0.18,0.14,0.15,0.16,0.15,0.09,0.2,0,0,0,0],
@@ -114,11 +103,9 @@ const LENIA_CREATURES = Dict(
                  dt = 0.1, kernel_radius = 13, kernel_type = "gaussian"),
 )
 
-# _lenia_build_kernel! — precomputa el kernel y TODO el estado de trabajo reutilizable que
-# necesita el update: el rfft del kernel, los planes FFTW reales (MEASURE) y los buffers
-# (A, Â, U). Así no se replanifica ni se reasigna memoria en cada paso. Lo llama lenia_init!
-# (post_init) o, en su defecto, el primer lenia_model_step! de forma perezosa.
-# Se mantiene :kernel_fft (FFT compleja) por compatibilidad con código que lo lea (p.ej. legacy).
+# Precomputa el kernel y el estado reutilizable del update (rfft del kernel, planes FFTW y
+# buffers) para no replanificar ni reasignar en cada paso. Lo llama lenia_init!, o de forma
+# perezosa el primer lenia_model_step!. :kernel_fft se mantiene por compatibilidad con legacy.
 function _lenia_build_kernel!(model)
     dims = size(abmspace(model))
     R    = Int(get(abmproperties(model), :kernel_radius, 13))
@@ -136,9 +123,9 @@ function _lenia_build_kernel!(model)
     s > 0.0 && (K ./= s)
 
     props = abmproperties(model)
-    props[:kernel_fft] = fft(K)                          # compatibilidad (lectura externa / legacy)
+    props[:kernel_fft] = fft(K)                          # compatibilidad con legacy
 
-    # --- estado optimizado: FFT real + planes + buffers reutilizables ---
+    # estado reutilizable: FFT real, planes y buffers
     Khat = rfft(K)                                       # rfft del kernel (una sola vez)
     A    = zeros(Float64, dims...)                       # buffer de campo (se rellena cada paso)
     Ahat = similar(Khat)                                 # buffer espectral
@@ -150,20 +137,18 @@ function _lenia_build_kernel!(model)
     return nothing
 end
 
-# lenia_init! — post_init por defecto. Construye el kernel y el estado de trabajo.
+# post_init por defecto: construye el kernel y el estado de trabajo.
 function lenia_init!(model)
     kernel_type = string(get(abmproperties(model), :kernel_type, "gaussian"))
     if kernel_type == "polynomial"
         abmproperties(model)[:kernel_fn] = (r::Float64) -> max(0.0, 1.0 - r^2)^4
     end
-    # kernel_type == "custom" → el usuario ya fijó abmproperties(model)[:kernel_fn] antes
+    # kernel_type == "custom": el usuario ya fijo abmproperties(model)[:kernel_fn] antes
     _lenia_build_kernel!(model)
 end
 
-# _lenia_run_step! — núcleo de un paso AISLADO en una función con tipos concretos
-# (barrera de tipos): los buffers/planes salen del Dict{Symbol,Any} como `Any`, pero al
-# pasarlos aquí el compilador especializa y todo el bucle caliente queda type-stable y
-# sin allocaciones intermedias.
+# Nucleo del paso en una funcion con tipos concretos: los buffers salen del Dict como Any,
+# pero al pasarlos como argumentos el compilador especializa el bucle.
 function _lenia_run_step!(model, st, μ::Float64, σ::Float64, dt::Float64, gfn::F) where {F}
     A, U, Ahat, Khat = st.A, st.U, st.Ahat, st.Khat
     pf, pb, invN     = st.pf, st.pb, st.invN
@@ -189,10 +174,8 @@ function _lenia_run_step!(model, st, μ::Float64, σ::Float64, dt::Float64, gfn:
     return nothing
 end
 
-# lenia_model_step! — update síncrono OPTIMIZADO (FFT real + planes/buffers cacheados +
-# barrera de tipos). Misma semántica y firma que la versión original: cualquier TOML que
-# use "lenia_model_step!" se acelera sin tocar nada. La versión original se conserva como
-# lenia_model_step_legacy! (abajo) para comparativas de rendimiento.
+# Update sincrono de Lenia (FFT real + planes/buffers cacheados). La version original esta
+# abajo como lenia_model_step_legacy!.
 function lenia_model_step!(model)
     props = abmproperties(model)
     haskey(props, :_lenia_state) || _lenia_build_kernel!(model)   # init perezoso si no hubo post_init
@@ -201,12 +184,10 @@ function lenia_model_step!(model)
     σ   = Float64(props[:lenia_sigma])
     dt  = Float64(props[:dt])
     gfn = get(props, :growth_fn, _lenia_growth_fn)
-    _lenia_run_step!(model, st, μ, σ, dt, gfn)               # barrera de tipos
+    _lenia_run_step!(model, st, μ, σ, dt, gfn)
 end
 
-# lenia_model_step_legacy! — versión original (FFT compleja, sin planes ni buffers, con
-# inestabilidad de tipos por el Dict de propiedades). Se conserva SOLO para comparar
-# rendimiento (ver bench/); no debe usarse en producción.
+# Version original (FFT compleja, sin planes ni buffers). Se conserva como referencia.
 function lenia_model_step_legacy!(model)
     dims = size(abmspace(model))
     A = zeros(Float64, dims...)
@@ -224,16 +205,13 @@ function lenia_model_step_legacy!(model)
     end
 end
 
-# lenia_noisy_step! — Lenia con forzamiento estocástico opcional.
-# Update FFT estándar + un campo de ruido gaussiano A' = A + η, η ~ N(0, σ), aplicado solo
-# dentro de una ventana temporal. Genérico para cualquier campo continuo: es inerte si no se
-# define `sigma_noise` (o vale 0), por lo que se comporta como lenia_model_step!.
-# El ruido usa abmrng(model) (seedeable) ⇒ reproducible y coherente entre la instancia de
-# datos y la de vídeo. Parámetros leídos de abmproperties(model):
-#   sigma_noise       σ del ruido (0 ⇒ sin ruido)
-#   noise_start_step  primer paso con ruido (= end ⇒ one-shot; muy grande ⇒ sostenido)
-#   noise_end_step    último paso con ruido
-#   noise_scope       "support" (perturba solo A>ε) | "field" (todo el campo)
+# Lenia con ruido gaussiano opcional dentro de una ventana temporal. Sin sigma_noise (o 0)
+# se comporta como lenia_model_step!. El ruido usa abmrng(model), asi que es reproducible.
+# Parametros en abmproperties(model):
+#   sigma_noise       sigma del ruido (0 = sin ruido)
+#   noise_start_step  primer paso con ruido
+#   noise_end_step    ultimo paso con ruido
+#   noise_scope       "support" (solo A>eps) | "field" (todo el campo)
 function lenia_noisy_step!(model)
     lenia_model_step!(model)                     # update Lenia estándar (clamp a [0,1])
 
@@ -242,7 +220,7 @@ function lenia_noisy_step!(model)
     t = props[:step_count]
 
     σ = Float64(get(props, :sigma_noise, 0.0))
-    σ <= 0.0 && return                           # sin ruido ⇒ Lenia determinista puro
+    σ <= 0.0 && return                           # sin ruido: Lenia determinista
 
     k0 = Int(get(props, :noise_start_step, typemax(Int)))
     k1 = Int(get(props, :noise_end_step,   typemax(Int)))
@@ -257,10 +235,10 @@ function lenia_noisy_step!(model)
     end
 end
 
-# --- MÉTRICAS DE RETÍCULA (genéricas; se nombran en [run].mdata y las resuelve Representation) ---
-total_energy(model) = sum(agent.state for agent in allagents(model))           # E = Σ Aᵢⱼ
+# --- Metricas (se nombran en [run].mdata) ---
+total_energy(model) = sum(agent.state for agent in allagents(model))           # energia total
 mean_state(model)   = total_energy(model) / max(1, nagents(model))             # densidad media
-active_cells(model) = count(agent -> agent.state > 1e-3, allagents(model))     # proxy de cohesión
+active_cells(model) = count(agent -> agent.state > 1e-3, allagents(model))     # celdas activas
 
 # --- PREDATOR PREY (stub) ---
 function predator_prey_step!(_agent, _model)

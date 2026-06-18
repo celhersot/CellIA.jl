@@ -1,18 +1,6 @@
-# =============================================================================
-#  Fotos y videos del experimento de energia/resiliencia del orbium (Iteracion 4)
-# =============================================================================
-# Recupera la config (examples/lenia_perturbation.toml) y las reglas
-# (examples/lenia_perturbation.jl) y ejecuta la simulacion en DOS fases:
-#
-#   - "normal"       : sin perturbacion (sigma_noise = 0). El orbium planea estable.
-#   - "perturbacion" : con ruido estocastico (sigma_noise del TOML, 0.04), que arranca
-#                      en noise_start_step. Se observa si el orbium sobrevive o colapsa.
-#
-# Por cada fase guarda: el VIDEO y TRES fotos (estado inicial, mitad y final), con la
-# energia total E en el titulo. NO ejecuta el LLM; solo simula.
-#
-# Uso:  julia examples/orbium_energia_fotos.jl
-# =============================================================================
+# Genera el video y tres fotos (inicial, mitad y final) del orbium en dos fases: sin
+# perturbacion y con ruido estocastico, leyendo lenia_perturbation.toml/.jl.
+#   julia examples/orbium_energia_fotos.jl
 import Pkg
 Pkg.activate(joinpath(@__DIR__, ".."))
 
@@ -50,7 +38,7 @@ function save_photo(A, title, path)
     hidedecorations!(ax); hidespines!(ax)
     heatmap!(ax, A; colormap = :viridis, colorrange = (0.0, 1.0))
     mkpath(dirname(path)); save(path, fig)
-    println("Foto:  $path")
+    println("Foto: $path")
 end
 
 function run_phase(base_config, key, label, sigma_noise)
@@ -100,10 +88,10 @@ function main()
     base = TOML.parsefile(joinpath(@__DIR__, "lenia_perturbation.toml"))
     sigma = Float64(get(base["properties"], "sigma_noise", 0.04))
 
-    println(">>> FASE NORMAL (sin perturbacion)")
+    println("Fase normal (sin perturbacion)")
     run_phase(base, "normal", "Normal (sin perturbacion)", 0.0)
 
-    println(">>> FASE CON PERTURBACIONES (sigma_noise=$sigma)")
+    println("Fase con perturbacion (sigma_noise=$sigma)")
     run_phase(base, "perturbacion", "Con perturbacion (sigma=$sigma)", sigma)
 end
 

@@ -2,13 +2,13 @@ module LLMBuilder
 
 # Local-LLM driven generator for Cell_IA simulations.
 #
-# Flow (see SPEC_MultiPrompt.md):
+# Flujo:
 #   1. route()                -> router-agent classifies the request into one of 4 categories
 #   2. confirm (CLI)          -> user accepts / rejects / corrects
 #   3. generate + validate    -> per-category system prompt, static validation, repair loop
 #   4. run + repair-on-error  -> execute; on Julia error, feed stderr back and regenerate
 #
-# Backend: llama-cli (bin/llama-cli.exe) — one-shot via -f prompt file, no server.
+# Backend: llama-cli (bin/llama-cli.exe), one-shot via -f prompt file, no server.
 
 using Downloads
 using TOML
@@ -16,7 +16,7 @@ using JSON
 
 export build_from_prompt, route, validate_files, load_prompt
 
-# ── Model configuration ──────────────────────────────────────────────────────────
+# --- Model configuration ---
 
 const MODEL_DIR  = joinpath(@__DIR__, "..", "models")
 const MODEL_NAME = "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
@@ -54,7 +54,7 @@ const MODEL_METRICS = Set(["total_energy", "mean_state", "active_cells"])
 # Read once at load time (the files ship with the framework).
 const ROUTER_GRAMMAR = read(joinpath(PROMPTS_DIR, "router.gbnf"), String)
 
-# ── Prompt loading ───────────────────────────────────────────────────────────────
+# --- Prompt loading ---
 
 function load_prompt(category::String)
     haskey(CATEGORIES, category) || error("Categoría desconocida: $category")
@@ -72,15 +72,15 @@ function load_router_prompt(exclude::Vector{String} = String[])
     return base
 end
 
-# ── Model download (only needed for the llama-cli fallback) ──────────────────────
+# --- Model download (only needed for the llama-cli fallback) ---
 
 function ensure_model_exists()
     isdir(MODEL_DIR) || mkpath(MODEL_DIR)
     if !isfile(MODEL_PATH)
-        println("--> Descargando modelo (una sola vez, ~1 GB)...")
+        println("Descargando modelo (una sola vez, ~1 GB)...")
         try
             Downloads.download(MODEL_URL, MODEL_PATH)
-            println("--> Modelo descargado.")
+            println("Modelo descargado.")
         catch e
             error("No se pudo descargar el modelo. Revisa la conexión: $e")
         end
@@ -88,7 +88,7 @@ function ensure_model_exists()
     return MODEL_PATH
 end
 
-# ── LLM call ─────────────────────────────────────────────────────────────────────
+# --- LLM call ---
 # Runs llama-cli once (no server). The model is loaded, generates, and we capture the
 # assistant turn from its output. Returns the assistant text only.
 #
@@ -100,7 +100,7 @@ end
 #   * In conversation mode it echoes the whole prompt and then waits for the next turn on
 #     stdin. We feed it "/exit" so it quits cleanly (exit 0) after one generation. We then
 #     extract only the text after the last <|im_start|>assistant marker (the prompt echo
-#     contains our few-shot examples — parsing the raw output would pick those up instead).
+#     contains our few-shot examples; parsing the raw output would pick those up instead).
 
 const GPU_LAYERS = parse(Int, get(ENV, "CELL_IA_GPU_LAYERS", "0"))
 
@@ -137,7 +137,7 @@ function _cli_completion(prompt::String; grammar, n_predict, timeout_s::Int = 30
     try
         write(prompt_file, prompt)
         # Conversation mode reads the next user turn from stdin after generating; feeding
-        # "/exit" makes llama quit cleanly (exit 0) on its own — no hang, nothing to kill.
+        # "/exit" makes llama quit cleanly (exit 0) on its own; no hang, nothing to kill.
         write(stdin_file, "/exit\n")
         isfile(out_file) && rm(out_file; force = true)
         cmd = `$llama_exe --model $(abspath(model_path)) -f $prompt_file --n-gpu-layers $GPU_LAYERS --ctx-size 8192 --n-predict $n_predict --temp 0.2 --no-display-prompt`
@@ -163,7 +163,7 @@ function _cli_completion(prompt::String; grammar, n_predict, timeout_s::Int = 30
     end
 end
 
-# ── Router ──────────────────────────────────────────────────────────────────────
+# --- Router ---
 
 function parse_router_json(text::AbstractString)
     m = match(r"\{.*\}"s, text)
@@ -192,7 +192,7 @@ function route(desc::String; exclude::Vector{String} = String[])
     error("El router no devolvió un JSON válido tras 2 intentos.")
 end
 
-# ── Confirmation loop (CLI) ───────────────────────────────────────────────────────
+# --- Confirmation loop (CLI) ---
 # Returns (category, final_description) or nothing if cancelled.
 
 function confirm_and_select(user_text::String; interactive::Bool = true)
@@ -209,11 +209,11 @@ function confirm_and_select(user_text::String; interactive::Bool = true)
         desc = build_desc()
         r = route(desc; exclude = excluded)
         if !interactive
-            println("--> Categoría elegida automáticamente: $(r.category)")
+            println("Categoría elegida automáticamente: $(r.category)")
             return (r.category, desc)
         end
         # Show the curated category description, not the router's noisy free-form approach.
-        println("\n--> Propuesta: $(CATEGORIES[r.category].desc)")
+        println("\nPropuesta: $(CATEGORIES[r.category].desc)")
         println("    (categoría interna: $(r.category))")
         print("¿Generar con este enfoque? [s / n / o escribe una corrección]: ")
         ans = strip(readline())
@@ -237,7 +237,7 @@ function confirm_and_select(user_text::String; interactive::Bool = true)
     return nothing
 end
 
-# ── Static validation ─────────────────────────────────────────────────────────────
+# --- Static validation ---
 # Returns (ok::Bool, error_msg::String). Does NOT execute Julia.
 
 function validate_files(files::Dict, category::String)
@@ -400,7 +400,7 @@ function validate_files(files::Dict, category::String)
     return (true, "")
 end
 
-# ── Response parser (FILENAME blocks / language fallback) ─────────────────────────
+# --- Response parser (FILENAME blocks / language fallback) ---
 
 function parse_llm_response(text::AbstractString)
     clean = replace(String(text), r"\e\[[0-9;]*m" => "")
@@ -448,10 +448,10 @@ end
 function _dump_raw(response::AbstractString, output_dir::String)
     path = abspath(joinpath(output_dir, "llm_raw_output.txt"))
     write(path, response)
-    println("--> Salida cruda del LLM guardada para inspección: $path")
+    println("Salida cruda del LLM guardada para inspección: $path")
 end
 
-# ── Generation + write + run ──────────────────────────────────────────────────────
+# --- Generation + write + run ---
 
 function _generate(category::String, desc::String; feedback::String = "")
     system = load_prompt(category)
@@ -463,11 +463,11 @@ end
 function _write_files(files::Dict, output_dir::String)
     toml_path = ""
     jl_path   = ""
-    println("\n--> Archivos generados en: $(abspath(output_dir))")
+    println("\nArchivos generados en: $(abspath(output_dir))")
     for (fn, content) in files
         p = abspath(joinpath(output_dir, fn))
         write(p, content * "\n")
-        println("    ✓ $p")
+        println("    $p")
         endswith(fn, ".toml") && (toml_path = p)
         endswith(fn, ".jl")   && (jl_path   = p)
     end
@@ -488,7 +488,7 @@ function _run_simulation(toml_path::String, jl_path::String)
     return (success(proc), output)
 end
 
-# ── Main entry point ───────────────────────────────────────────────────────────────
+# --- Main entry point ---
 
 function build_from_prompt(user_text::String;
                            interactive::Bool = true,
@@ -530,10 +530,10 @@ function build_from_prompt(user_text::String;
     # 4. Write + run with an execution-error repair loop.
     toml_path, jl_path = _write_files(files, output_dir)
     for attempt in 1:2
-        println("\n--> Ejecutando simulación (intento $attempt)...")
+        println("\nEjecutando simulación (intento $attempt)...")
         ok, errmsg = _run_simulation(toml_path, jl_path)
         if ok
-            println("--> ✓ Simulación completada.")
+            println("Simulación completada.")
             return output_dir
         end
         @warn "La ejecución falló."
@@ -546,7 +546,7 @@ function build_from_prompt(user_text::String;
         end
     end
 
-    println("--> No se pudo ejecutar sin errores automáticamente. Revisa los archivos y ejecuta a mano:")
+    println("No se pudo ejecutar sin errores automáticamente. Revisa los archivos y ejecuta a mano:")
     println("    julia --project=. examples/main.jl $toml_path" *
             (isempty(jl_path) ? "" : " $jl_path"))
     return output_dir

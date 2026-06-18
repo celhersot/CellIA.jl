@@ -1,8 +1,5 @@
-# Simulación 2 — pointillista (sin camaleón).
-# El espacio muestra (de fondo) la imagen a copiar en menor resolución. Los agentes
-# CONSERVAN su color aleatorio y solo buscan su posición: van a la celda cuyo color
-# objetivo más se parece al suyo, desplazándose píxel a píxel.
-#
+# Variante pointillista: los agentes conservan su color aleatorio y solo buscan su
+# sitio; el fondo muestra la imagen objetivo a copiar.
 #   julia examples/main.jl examples/image_trace_pointillist.toml examples/image_trace.jl
 
 [simulation]
@@ -19,13 +16,13 @@ metric = "chebyshev"
 state_type = "Painter"
 
 [properties]
-image_path     = ""        # ruta a tu PNG/JPG. Vacío → patrón sintético de demostración.
-density        = 0.6       # algo menor: deja ver el fondo objetivo
+image_path     = ""        # PNG/JPG; vacio = patron de demo
+density        = 0.6       # menor: deja ver el fondo objetivo
 search_radius  = 10
-chameleon      = false     # NO cambian de color: solo buscan su sitio
+chameleon      = false     # no cambian de color, solo buscan sitio
 chameleon_rate = 0.0
 arrival_tol    = 0.10
-patience       = 5         # algo más de paciencia: prioriza encontrar buen sitio
+patience       = 5
 
 [rules]
 initialization_rule = "empty"
@@ -37,6 +34,6 @@ filename               = "output_videos/image_trace_pointillist.mp4"
 title                  = "Buscando su sitio (pointillista)"
 color_scheme           = "rgb"
 background_color       = "black"
-show_target_background = true            # el fondo muestra la imagen a copiar
+show_target_background = true
 framerate              = 20
 frames                 = 220

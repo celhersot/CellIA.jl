@@ -12,12 +12,12 @@ include("../src/Representation.jl")
 using .Initialization
 using .Representation
 
-# Using user code
+# Carga un archivo de reglas de usuario dentro de CustomEvolutionRules.
 function load_user_rules(rules_file::String)
     if !isfile(rules_file)
         error("Archivo de reglas no encontrado: $rules_file")
     end
-    println("--> Inyectando reglas de usuario desde: $rules_file")
+    println("Cargando reglas de usuario: $rules_file")
     Base.include(Main.CustomEvolutionRules, abspath(rules_file))
 end
 
@@ -32,11 +32,11 @@ function main(config_file::String, rules_file::Union{String, Nothing}=nothing)
     if !isnothing(rules_file) && isfile(rules_file)
         load_user_rules(rules_file)
     else
-        println("--> No se proporcionó archivo de reglas. Usando reglas predefinidas.")
+        println("Sin archivo de reglas; uso las predefinidas.")
     end
 
     Base.invokelatest(_execute, config)
-    println("--> Done.")
+    println("Listo.")
 end
 
 function _execute(config)
@@ -44,10 +44,9 @@ function _execute(config)
     viz      = get(config, "visualization", nothing)
     run_conf = get(config, "run", nothing)
 
-    # Each output gets its own freshly-initialized model so they are independent
-    # (run! and video would otherwise advance the same model cumulatively).
+    # Cada salida usa su propio modelo recien inicializado (run! y video son independientes).
     if !isnothing(run_conf)
-        println("--> Initializing $name (run)...")
+        println("Inicializando $name (run)...")
         model = initialize_model(config)
         run_simulation(model, run_conf,
                        isnothing(viz) ? Dict{String,Any}() : viz,
@@ -55,9 +54,9 @@ function _execute(config)
     end
 
     if !isnothing(viz) && haskey(viz, "filename")
-        println("--> Initializing $name (video)...")
+        println("Inicializando $name (video)...")
         model = initialize_model(config)
-        println("--> Generating video...")
+        println("Generando video...")
         video_simulation(model, viz, config["space"])
     end
 end

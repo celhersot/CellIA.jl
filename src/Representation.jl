@@ -21,11 +21,9 @@ function get_agent_color(a, color_scheme)
 end
 
 const SPECIAL_FUNCTIONS = Dict(
-    "marker" => marker_shape,   # legacy alias
-    "arrow"  => marker_shape,   # oriented arrow for continuous-space agents (reusable)
+    "marker" => marker_shape,
+    "arrow"  => marker_shape,   # flecha orientada para agentes en espacio continuo
 )
-
-# ── Shared helpers ─────────────────────────────────────────────────────────────
 
 const _FALLBACK_COLORS = [
     "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
@@ -36,13 +34,13 @@ function _build_agent_color_fn(viz_config)
     color_scheme = get(viz_config, "color_scheme", nothing)
     var_name     = get(viz_config, "variable_to_color", "state")
 
-    # Precompute colormap once if color_scheme is a named palette string (e.g. "viridis").
+    # Si color_scheme es una paleta con nombre (p.ej. "viridis"), se precalcula una vez.
     cmap = nothing
     if isa(color_scheme, AbstractString) && !startswith(color_scheme, "#")
         try
             cmap = Makie.to_colormap(Symbol(color_scheme))
         catch
-            cmap = nothing   # fall through to Dict/fallback logic
+            cmap = nothing
         end
     end
 
@@ -57,10 +55,7 @@ function _build_agent_color_fn(viz_config)
             raw = agent.state
         end
 
-        # State that *is* a color: a Colorant, or any struct exposing r/g/b fields.
-        # Generic — lets any model carry a per-agent RGB and render it verbatim
-        # (e.g. the image-tracing painters). Placed before the colormap/Dict logic;
-        # primitive states (Int/Float/Symbol/String/Bool) have no r/g/b properties.
+        # Estado que ya es un color: un Colorant, o cualquier struct con campos r/g/b.
         if raw isa Colorant
             return raw
         elseif hasproperty(raw, :r) && hasproperty(raw, :g) && hasproperty(raw, :b)
@@ -69,7 +64,7 @@ function _build_agent_color_fn(viz_config)
                         clamp(Float64(getproperty(raw, :b)), 0.0, 1.0))
         end
 
-        # Named colormap + numeric state → continuous mapping into [0,1]
+        # Paleta con nombre + estado numerico: mapeo continuo a [0,1].
         if !isnothing(cmap) && isa(raw, AbstractFloat)
             t   = clamp(Float64(raw), 0.0, 1.0)
             idx = max(1, round(Int, t * (length(cmap) - 1) + 1))
@@ -94,13 +89,8 @@ function _build_agent_shape_fn(viz_config)
     return resolve
 end
 
-# ── Hexagonal rendering ────────────────────────────────────────────────────────
-# Cell color is driven by viz_config keys:
-#   cell_color_property  – key inside cell_properties to read (e.g. "honey")
-#   cell_color_max       – numeric maximum for gradient normalisation (default 1.0)
-# When the value is numeric → white-to-amber gradient.
-# When symbolic/string    → looked up in color_scheme.
-
+# Color de celda hexagonal segun viz_config: cell_color_property (clave en cell_properties)
+# y cell_color_max. Valor numerico = gradiente blanco-ambar; simbolico = color_scheme.
 function _cell_color(cell_props::Dict{Symbol, Any}, viz_config)
     prop = get(viz_config, "cell_color_property", nothing)
     isnothing(prop) && return RGBAf(1.0, 1.0, 1.0, 1.0)
@@ -111,7 +101,7 @@ function _cell_color(cell_props::Dict{Symbol, Any}, viz_config)
     if isa(val, Number)
         max_val = Float64(get(viz_config, "cell_color_max", 1.0))
         t = clamp(Float64(val) / max_val, 0.0, 1.0)
-        return RGBAf(1.0, 1.0 - 0.25*t, 1.0 - t, 1.0)   # white → amber
+        return RGBAf(1.0, 1.0 - 0.25*t, 1.0 - t, 1.0)
     else
         scheme = get(viz_config, "color_scheme", Dict())
         c = get(scheme, string(val), "white")
@@ -162,17 +152,15 @@ function record_hexagonal(model, viz_config)
     xlims!(ax, -m, xmax)
     ylims!(ax, -m, ymax)
 
-    println("Recording $frames frames → $output ...")
+    println("Grabando $frames frames en $output...")
     record(fig, output, 1:frames; framerate=fps) do frame
         empty!(ax)
-        ax.title = "$title — step $frame"
+        ax.title = "$title - paso $frame"
         _draw_hex_frame!(ax, model, viz_config, agent_color_fn)
         step!(model, 1)
     end
-    println("Saved: $output")
+    println("Guardado: $output")
 end
-
-# ── _save_heatmap_photo ────────────────────────────────────────────────────────
 
 function _save_heatmap_photo(A::Matrix{Float64}, cmap::Symbol, title::String, path::String)
     fig = Figure(size=(600, 600), backgroundcolor=:black)
@@ -183,16 +171,11 @@ function _save_heatmap_photo(A::Matrix{Float64}, cmap::Symbol, title::String, pa
     dir = dirname(path)
     !isempty(dir) && mkpath(dir)
     save(path, fig)
-    println("Saved photo: $path")
+    println("Foto guardada: $path")
 end
 
-# ── record_grid_heatmap ────────────────────────────────────────────────────────
-# Used for grid simulations with a continuous float state and a named colormap
-# (e.g. Lenia). Renders a full-coverage heatmap with black background.
-# Optional keys in viz_config:
-#   photos       – bool, save step-0 and final-frame photos (default false)
-#   photo_prefix – path prefix for photo files (default "output_photos/sim")
-
+# Heatmap para grids con estado float continuo y paleta con nombre (p.ej. Lenia).
+# Claves opcionales en viz_config: photos (guardar foto inicial y final), photo_prefix.
 function record_grid_heatmap(model, viz_config)
     cmap   = get(viz_config, "color_scheme", "viridis")
     frames = get(viz_config, "frames", 50)
@@ -226,26 +209,20 @@ function record_grid_heatmap(model, viz_config)
     hidespines!(ax)
     heatmap!(ax, A_obs; colormap=cmap_sym, colorrange=(0.0, 1.0))
 
-    println("Recording $frames frames → $output ...")
+    println("Grabando $frames frames en $output...")
     record(fig, output, 1:frames; framerate=fps) do _
         step!(model, 1)
         A_obs[] = _state_matrix()
     end
-    println("Saved: $output")
+    println("Guardado: $output")
 
     if photos
         _save_heatmap_photo(A_obs[], cmap_sym, title, "$(photo_pfx)_final.png")
     end
 end
 
-# ── record_rgb_grid ──────────────────────────────────────────────────────────
-# Grid renderer for agents that carry a per-agent RGB color (color_scheme = "rgb").
-# Each agent paints its own cell; empty cells show the background. The background is
-# either a flat color (background_color, default black) or, when show_target_background
-# is true and the model exposes a :background_image (Matrix of Colorant), that image.
-# This is how the image-tracing model is visualized, but it is generic: any grid model
-# whose agent state encodes a color renders here.
-
+# Render de grid para agentes que llevan color RGB propio (color_scheme = "rgb"): cada
+# agente pinta su celda y las vacias muestran el fondo (color plano o background_image).
 function _compose_rgb_canvas(model, base, colorfn, nx, ny)
     canvas = copy(base)
     @inbounds for a in allagents(model)
@@ -287,15 +264,13 @@ function record_rgb_grid(model, viz_config)
 
     dir = dirname(output)
     !isempty(dir) && mkpath(dir)
-    println("Recording $frames frames → $output ...")
+    println("Grabando $frames frames en $output...")
     record(fig, output, 1:frames; framerate = fps) do _
         step!(model, 1)
         canvas[] = _compose_rgb_canvas(model, base, colorfn, nx, ny)
     end
-    println("Saved: $output")
+    println("Guardado: $output")
 end
-
-# ── video_simulation ───────────────────────────────────────────────────────────
 
 function video_simulation(model, viz_config, space_config)
     if space_config["type"] == "hexagonal"
@@ -305,15 +280,14 @@ function video_simulation(model, viz_config, space_config)
 
     color_scheme = get(viz_config, "color_scheme", nothing)
 
-    # Grid + per-agent RGB color (each agent paints its own cell). Checked before the
-    # heatmap branch because "rgb" is also a plain (non-"#") string.
+    # "rgb" se comprueba antes que el heatmap porque tambien es un string sin "#".
     if space_config["type"] == "grid" &&
             isa(color_scheme, AbstractString) && lowercase(color_scheme) == "rgb"
         record_rgb_grid(model, viz_config)
         return
     end
 
-    # Grid + named colormap → heatmap rendering (e.g. Lenia)
+    # Grid + paleta con nombre: heatmap (p.ej. Lenia).
     if space_config["type"] == "grid" &&
             isa(color_scheme, AbstractString) && !startswith(color_scheme, "#")
         record_grid_heatmap(model, viz_config)
@@ -340,14 +314,12 @@ function video_simulation(model, viz_config, space_config)
     )
 end
 
-# ── photo_simulation ───────────────────────────────────────────────────────────
-# output_path: if provided, saves the figure to that file.
-
+# Guarda una foto del estado actual. output_path: ruta donde guardar la figura.
 function photo_simulation(model, viz_config, space_config,
                           output_path::Union{String, Nothing}=nothing)
     color_scheme = get(viz_config, "color_scheme", nothing)
 
-    # Grid + per-agent RGB color → single composed canvas (mirrors record_rgb_grid).
+    # Grid + color RGB por agente: compone un unico lienzo (igual que record_rgb_grid).
     if space_config["type"] == "grid" &&
             isa(color_scheme, AbstractString) && lowercase(color_scheme) == "rgb"
         nx, ny  = size(abmspace(model))
@@ -362,13 +334,12 @@ function photo_simulation(model, viz_config, space_config,
         if !isnothing(output_path)
             dir = dirname(output_path); !isempty(dir) && mkpath(dir)
             save(output_path, fig)
-            println("Saved photo: $output_path")
+            println("Foto guardada: $output_path")
         end
         return fig
     end
 
-    # Use heatmap for grid spaces whose state is a float, regardless of whether
-    # color_scheme is set (default to "viridis" when not specified).
+    # Heatmap para grids con estado float (paleta por defecto "viridis").
     first_ag = isempty(allagents(model)) ? nothing : first(allagents(model))
     state_is_float = !isnothing(first_ag) && isa(first_ag.state, AbstractFloat)
     use_heatmap = space_config["type"] == "grid" && state_is_float
@@ -405,23 +376,13 @@ function photo_simulation(model, viz_config, space_config,
         dir = dirname(output_path)
         !isempty(dir) && mkpath(dir)
         save(output_path, fig)
-        println("Saved photo: $output_path")
+        println("Foto guardada: $output_path")
     end
     return fig
 end
 
-# ── run_simulation ─────────────────────────────────────────────────────────────
-# Drives the model with run!, collects per-step data, writes a CSV.
-# Optionally saves a heatmap/plot at step 0 and at the final step.
-#
-# Relevant TOML keys in [run]:
-#   steps        – number of steps to run (default 100)
-#   output       – CSV output path (default "output_data/results.csv")
-#   adata        – list of agent property names to collect (default ["state"])
-#   mdata        – list of model property names to collect (default [])
-#   photos       – bool, save photos at step 0 and final step (default false)
-#   photo_prefix – path prefix for photo files (default "output_photos/sim")
-
+# Ejecuta el modelo con run!, recoge datos por paso y escribe un CSV.
+# Claves de [run]: steps, output (ruta CSV), adata, mdata, photos, photo_prefix.
 function _write_csv(path::String, df)
     dir = dirname(path)
     !isempty(dir) && mkpath(dir)
@@ -433,13 +394,9 @@ function _write_csv(path::String, df)
     end
 end
 
-# Resolve one [run].adata / [run].mdata entry.
-# If the name matches a FUNCTION defined in CustomEvolutionRules, return the function
-# object — Agents.jl run! then samples f(model) (mdata) or f(agent) (adata) every step,
-# which is how a *computed* metric (total energy, entropy, active-cell count, …) is
-# collected. Otherwise return a Symbol, i.e. a plain model property / agent field name
-# (the previous behaviour). Generic: any model can declare a metric by naming a function
-# in its rules file — nothing here is specific to Lenia or to "energy".
+# Resuelve una entrada de [run].adata / [run].mdata. Si el nombre coincide con una funcion
+# de CustomEvolutionRules, devuelve la funcion (run! la muestrea cada paso como metrica
+# calculada); si no, devuelve el Symbol (propiedad del modelo o campo del agente).
 function _resolve_metric(key)
     sym = Symbol(key)
     if isdefined(Main.CustomEvolutionRules, sym)
@@ -464,16 +421,16 @@ function run_simulation(model, run_config, viz_config, space_config)
         photo_simulation(model, viz_config, space_config, "$(photo_pfx)_step0.png")
     end
 
-    println("Running $steps steps...")
+    println("Ejecutando $steps pasos...")
     adf, mdf = run!(model, steps; adata=adata, mdata=mdata)
 
-    # Prefer agent data; fall back to model data if no adata was requested.
+    # Se prefieren los datos por agente; si no se pidieron, se guardan los del modelo.
     df_to_save = !isnothing(adata) ? adf : mdf
     if !isempty(df_to_save)
         _write_csv(output, df_to_save)
-        println("Saved results: $output")
+        println("Resultados guardados: $output")
     else
-        println("No data collected (both adata and mdata are empty).")
+        println("No se recogieron datos (adata y mdata vacios).")
     end
 
     if photos
