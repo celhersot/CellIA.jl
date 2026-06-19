@@ -1,0 +1,35 @@
+[simulation]
+model_name = "FlockingModel"
+seed = 42
+
+[space]
+type = "continuous"
+dimensions = [100, 100]
+periodic = true
+
+[properties]
+
+[agents]
+state_type = "Bird"
+speed = 1.0
+cohere_factor = 0.1
+separation = 2.0
+separate_factor = 0.25
+match_factor = 0.04
+visual_distance = 5.0
+
+[population]
+pop_quantity = { "Bird" = 100 }
+
+[rules]
+agent_step = "agent_step!"
+initialization_rule = "random"
+
+[visualization]
+filename = "output_videos/flocking.mp4"
+title = "Flocking model"
+variable_to_color = "state.status"
+color_scheme = { Bird = "yellow"}
+agent_shape = "marker"
+frames = 150
+framerate = 20

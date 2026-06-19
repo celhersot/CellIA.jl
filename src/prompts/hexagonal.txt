@@ -1,0 +1,56 @@
+CATEGORY: hexagonal — models on a HEXAGONAL grid (honeycomb), optionally with per-cell properties.
+
+SPACE: type="hexagonal". state_type = "Bool" | "Int" | "Symbol". Agents occupy hex cells.
+A _rules.jl IS REQUIRED (there is no built-in hexagonal rule).
+RULES: agent_step="<your_fn!>"  initialization_rule="random".
+POPULATION: pop_quantity = { <state> = N } (e.g. { true = 25 }).
+
+INSIDE THE _rules.jl (same conventions as grid — NO using / import / module / @agent):
+- neighbours by position: nearby_positions(agent.pos, model)
+- move an agent:           move_agent!(agent, new_pos, model)
+- per-cell properties:     props = abmspace(model).cell_properties[agent.pos]; props[:honey] = get(props, :honey, 0.0) + 0.5
+- randomness:              rand(abmrng(model), collection)
+
+VISUALIZATION: agent_shape="hexagon"; variable_to_color="state"; color_scheme = { <state> = "colour" }.
+Optional per-cell colouring: cell_color_property="honey" with cell_color_max=15.0 (numeric cell property → white-to-amber gradient).
+
+EXAMPLE — bee hive (per-cell honey accumulation):
+FILENAME: hive.toml
+```toml
+[simulation]
+model_name = "BeeHive"
+seed = 42
+[space]
+type = "hexagonal"
+dimensions = [12, 14]
+periodic = false
+[agents]
+state_type = "Bool"
+[population]
+pop_quantity = { true = 25 }
+[rules]
+agent_step = "bee_step!"
+initialization_rule = "random"
+[visualization]
+filename = "output_videos/hive.mp4"
+frames = 80
+framerate = 10
+title = "Bee Hive Simulation"
+agent_size = 15
+color_scheme = { true = "black" }
+variable_to_color = "state"
+agent_shape = "hexagon"
+cell_color_property = "honey"
+cell_color_max = 15.0
+```
+FILENAME: hive_rules.jl
+```julia
+function bee_step!(agent, model)
+    neighbors = nearby_positions(agent.pos, model)
+    if !isempty(neighbors)
+        move_agent!(agent, rand(abmrng(model), neighbors), model)
+    end
+    props = abmspace(model).cell_properties[agent.pos]
+    props[:honey] = get(props, :honey, 0.0) + 0.5
+end
+```

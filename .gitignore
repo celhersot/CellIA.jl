@@ -1,0 +1,16 @@
+/Manifest*.toml
+/models/*
+/bin/*
+
+# Salidas generadas (a salvo en ../outputs_Cell_IA)
+/output_videos/
+/output_fotos/
+/output_photos/
+/output_data/
+/bench/profile/
+/iteration5.png
+/iteration5.svg
+
+# Archivos locales (no se publican)
+/CLAUDE.md
+/specs.md

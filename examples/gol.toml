@@ -1,0 +1,33 @@
+[simulation]
+model_name = "GameOfLife"
+seed = 125
+
+[space]
+type = "grid"
+dimensions = [512, 512]
+periodic = true
+
+[properties]
+min_to_live = 2
+max_to_live = 3
+
+[agents]
+state_type = "Bool"
+
+[population]
+pop_density = { true = 0.7, false = 0.3 }
+
+[rules]
+agent_step = "gol_step!"
+model_step = "default_model_step!"
+initialization_rule = "random"
+
+[visualization]
+filename = "output_videos/gol.mp4"
+title = "Conway's Game of Life"
+variable_to_color = "state"
+color_scheme = { true = "black", false = "white" }
+agent_shape = "rect"
+agent_size = 1
+framerate = 10
+frames = 100

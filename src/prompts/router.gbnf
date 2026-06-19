@@ -1,0 +1,5 @@
+root ::= "{" space "\"approach\"" space ":" space string "," space "\"category\"" space ":" space category "}" space
+category ::= "\"grid_discrete\"" | "\"continuous_field\"" | "\"continuous_space\"" | "\"hexagonal\""
+string ::= "\"" char* "\""
+char ::= [^"\\] | "\\" (["\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F])
+space ::= [ \t\n]*

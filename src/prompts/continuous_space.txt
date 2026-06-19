@@ -1,0 +1,84 @@
+CATEGORY: continuous_space — agents that MOVE through continuous 2D space (flocking, swarms, particles).
+
+SPACE: type="continuous". state_type = the name of a custom struct you define in the _rules.jl.
+
+A _rules.jl IS REQUIRED. It must contain, in this order:
+- using Agents
+- using Random, LinearAlgebra
+- an @agent struct subtyping ContinuousAgent{2, Float64}, with one `const` field per agent parameter
+- function agent_step!(agent, model) ... end that steers using nearby_agents(agent, model, radius), accumulates SVector velocities, and ENDS with move_agent!(agent, model, speed)
+
+KEY POPULATION RULE: the framework instantiates each agent by reading EVERY struct field from the [agents] TOML section, by name. So every `const` field of your struct MUST appear under [agents] with a value. (The fields id, pos and vel are added automatically by @agent — do NOT declare or list them.)
+POPULATION: pop_quantity = { "<StructName>" = N }.
+RULES: agent_step="agent_step!"  initialization_rule="random". Do NOT use model_step or model.next_states here — movement is applied directly via move_agent!.
+
+VISUALIZATION: agent_shape="arrow" (an arrow oriented by the agent's velocity); variable_to_color="state.<field>" or by type; color_scheme = { "<StructName>" = "colour" }.
+
+EXAMPLE — flocking / boids:
+FILENAME: flocking.toml
+```toml
+[simulation]
+model_name = "FlockingModel"
+seed = 42
+[space]
+type = "continuous"
+dimensions = [100, 100]
+periodic = true
+[agents]
+state_type = "Bird"
+speed = 1.0
+cohere_factor = 0.1
+separation = 2.0
+separate_factor = 0.25
+match_factor = 0.04
+visual_distance = 5.0
+[population]
+pop_quantity = { "Bird" = 100 }
+[rules]
+agent_step = "agent_step!"
+initialization_rule = "random"
+[visualization]
+filename = "output_videos/flocking.mp4"
+title = "Flocking model"
+variable_to_color = "state.status"
+color_scheme = { Bird = "yellow" }
+agent_shape = "arrow"
+frames = 150
+framerate = 20
+```
+FILENAME: flocking_rules.jl
+```julia
+using Agents
+using Random, LinearAlgebra
+
+@agent struct Bird(ContinuousAgent{2, Float64})
+    const speed::Float64
+    const cohere_factor::Float64
+    const separation::Float64
+    const separate_factor::Float64
+    const match_factor::Float64
+    const visual_distance::Float64
+end
+
+function agent_step!(bird, model)
+    neighbor_agents = nearby_agents(bird, model, bird.visual_distance)
+    N = 0
+    match = separate = cohere = SVector{2}(0.0, 0.0)
+    for neighbor in neighbor_agents
+        N += 1
+        heading = get_direction(bird.pos, neighbor.pos, model)
+        cohere += heading
+        match  += neighbor.vel
+        if sum(heading .^ 2) < bird.separation^2
+            separate -= heading
+        end
+    end
+    cohere   *= bird.cohere_factor
+    separate *= bird.separate_factor
+    match    *= bird.match_factor
+    bird.vel += (cohere + separate + match) / max(N, 1)
+    bird.vel /= norm(bird.vel)
+    return move_agent!(bird, model, bird.speed)
+end
+```
+Note how every `const` field (speed, cohere_factor, separation, separate_factor, match_factor, visual_distance) has a matching value under [agents]. Keep that correspondence for any struct you invent.
