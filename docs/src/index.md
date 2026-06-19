@@ -1,48 +1,127 @@
 # Cell\_IA.jl
 
-*Framework de simulación de autómatas y modelos basados en agentes (ABM) configurables por TOML.*
+*A TOML-configurable framework for cellular automata and agent-based models (ABM).*
 
-Cell\_IA es un framework escrito en Julia, construido sobre
-[Agents.jl](https://github.com/JuliaDynamics/Agents.jl), cuyo objetivo es **definir y
-ejecutar simulaciones sin escribir código**: el usuario describe el modelo en un archivo
-`.toml` (espacio, agentes, población, reglas, visualización) y el framework lo construye,
-lo ejecuta y genera la salida (vídeo MP4, fotos PNG o datos CSV).
+Cell\_IA is a framework written in Julia, built on top of
+[Agents.jl](https://github.com/JuliaDynamics/Agents.jl), whose goal is to **define and run
+simulations without writing code**: the user describes the model in a `.toml` file (space,
+agents, population, rules, visualization) and the framework builds it, runs it and produces
+the output (an MP4 video, PNG photos or CSV data).
 
-## Filosofía
+```@raw html
+<video src="assets/orbium.mp4" autoplay loop muted playsinline width="360" style="border-radius:8px"></video>
+```
+*An [`orbium`](https://chakazul.github.io/lenia.html) — a self-propelling Lenia creature — running in Cell\_IA.*
 
-- **Configuración, no programación.** Un modelo es un TOML; el motor es genérico y no conoce
-  los modelos concretos.
-- **Reglas modulares.** Las dinámicas viven en `CustomEvolutionRules`; añadir un modelo nuevo
-  es escribir una función de regla y, si hace falta, un struct de estado.
-- **Mismo motor, muchas salidas.** A partir de un modelo se puede pedir un vídeo, una foto del
-  estado, o una recogida de métricas a CSV.
-- **Diseño asistido por IA (opcional).** [`build_from_prompt`](@ref) traduce una descripción en
-  lenguaje natural a un TOML ejecutable mediante un LLM local.
+## Highlights
 
-## Instalación
+- **Lenia, out of the box.** Cell\_IA is, as far as we know, the **first agent-based framework
+  in Julia where you can run *and* customize Lenia** (continuous cellular automata): seed an
+  orbium, change the growth function μ/σ, add stochastic perturbations, and measure the
+  organism's energy — all from a TOML.
+- **The first public hexagonal space for Agents.jl.** [`HexagonalGridSpace`](@ref) is a custom
+  `Agents.AbstractSpace`. This is the first publicly available hexagonal space built on
+  Agents.jl: **anyone using Agents.jl can run their own hexagonal simulations simply by copying
+  the abstract space definition** ([`src/spaces/HexagonalSpace.jl`](https://github.com/celhersot/Cell_IA/blob/main/src/spaces/HexagonalSpace.jl)).
+
+```@raw html
+<video src="assets/hexagonal_hive.mp4" autoplay loop muted playsinline width="360" style="border-radius:8px"></video>
+```
+*A model on the hexagonal grid space.*
+
+## Philosophy
+
+- **Configuration, not programming.** A model is a TOML file; the engine is generic and knows
+  nothing about specific models.
+- **Modular rules.** Dynamics live in `CustomEvolutionRules`; adding a new model means writing
+  a rule function and, if needed, a state struct.
+- **One engine, many outputs.** From a single model you can request a video, a snapshot of the
+  state, or a collection of metrics as CSV.
+- **AI-assisted design (optional).** [`build_from_prompt`](@ref) translates a natural-language
+  description into a runnable TOML using a local LLM.
+
+## Installation
 
 ```julia
 using Pkg
 Pkg.add(url = "https://github.com/celhersot/Cell_IA")
 ```
 
-## Un vistazo rápido
+## The three ways to run a simulation
+
+### 1. An existing example with just its TOML
+
+Models whose rules are built in only need their `.toml`:
+
+```bash
+julia examples/main.jl examples/gol.toml
+```
+
+### 2. An existing example with its TOML *and* its `.jl` rules
+
+Models that ship their own state struct and/or rule functions pass a second argument, the rules
+file. `main.jl` injects it into `CustomEvolutionRules` before running:
+
+```bash
+julia examples/main.jl examples/flocking.toml examples/flocking.jl
+```
+
+### 3. Generating a simulation from a natural-language prompt (local LLM)
+
+[`build_from_prompt`](@ref) routes your description to one of the four model categories, writes
+the `.toml` (and a `_rules.jl` if needed), validates it and runs it. The first call downloads a
+~1 GB model into `models/` and runs it on CPU via `bin/llama-cli`:
+
+```julia
+using Cell_IA
+build_from_prompt("a flock of birds that group together as they move")
+```
+
+```@raw html
+<video src="assets/flocking.mp4" autoplay loop muted playsinline width="360" style="border-radius:8px"></video>
+```
+*Flocking / boids in continuous space.*
+
+## A quick look (programmatic API)
+
+The flow is: read the TOML → [`initialize_model`](@ref) → request an output.
 
 ```julia
 using Cell_IA, TOML
 
-config = TOML.parsefile("examples/organismo.toml")  # describe el modelo
-model  = initialize_model(config)                    # construye y puebla el mundo
-video_simulation(model, config["visualization"], config["space"])  # genera el MP4
+config = TOML.parsefile("examples/organismo.toml")  # describes the model
+model  = initialize_model(config)                    # builds and populates the world
+
+video_simulation(model, config["visualization"], config["space"])  # → MP4
+photo_simulation(model, config["visualization"], config["space"])  # → PNG snapshot
+run_simulation(model, config["run"], config["visualization"], config["space"])  # → CSV metrics
 ```
 
-O directamente desde la línea de comandos con el lanzador de ejemplos:
+## Where the outputs are saved
 
-```bash
-julia examples/main.jl examples/organismo.toml
-```
+The output functions follow the paths declared in the TOML and default to dedicated folders:
 
-## Contenido
+| Output | Function | Default location |
+|---|---|---|
+| Video (MP4) | [`video_simulation`](@ref) | `[visualization].filename`, e.g. `output_videos/<name>.mp4` |
+| Photos (PNG) | [`photo_simulation`](@ref) | `[visualization].photo_prefix`, default `output_photos/sim*` |
+| Metrics (CSV) | [`run_simulation`](@ref) | `[run].output`, default `output_data/results.csv` |
+
+These folders are created automatically and are git-ignored.
+
+## The four simulation categories
+
+Every model — whether handwritten or generated by the LLM — falls into one of these four
+categories, which determine the kind of space and rules used:
+
+| Category | What it is | Space |
+|---|---|---|
+| `grid_discrete` | Cellular automaton on a grid where each cell holds a **discrete** state (alive/dead, a colour, a species) and updates from its neighbours. Game-of-Life style. | `grid` |
+| `continuous_field` | **Lenia**-type: a grid whose cells hold a **continuous** value in [0, 1] that together form an organism flowing smoothly across the grid. | `grid` |
+| `continuous_space` | **Flocking/boids**: many agents move as points through a continuous space (no grid) and group according to their neighbours. | `continuous` |
+| `hexagonal` | Models on a **hexagonal** grid (honeycomb), with per-cell properties. Hive style. | `hexagonal` |
+
+## Contents
 
 ```@contents
 Pages = ["guia.md", "api.md"]
