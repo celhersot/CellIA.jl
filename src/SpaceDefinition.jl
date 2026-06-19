@@ -3,6 +3,14 @@ using Agents
 using ..HexagonalSpace
 export create_space
 
+"""
+    create_space(config::Dict)
+
+Crea el espacio de la simulación a partir de `config["space"]`. Según el campo `type`
+devuelve un `GridSpaceSingle` (`"grid"`), un `ContinuousSpace` (`"continuous"`) o un
+`HexagonalGridSpace` (`"hexagonal"`), usando `dimensions`, `periodic` y `metric`.
+Es el primer paso de `initialize_model`.
+"""
 function create_space(config::Dict)
     space_conf = config["space"]
     type = space_conf["type"]

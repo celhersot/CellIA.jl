@@ -9,6 +9,22 @@ using ..CustomEvolutionRules
 
 export initialize_model
 
+"""
+    initialize_model(config::Dict) -> StandardABM
+
+Construye y puebla un modelo de [Agents.jl](https://github.com/JuliaDynamics/Agents.jl)
+a partir de un diccionario de configuración (normalmente el resultado de leer un TOML).
+
+A partir de `config` la función:
+- crea el espacio (grid, continuo o hexagonal) con [`create_space`](@ref);
+- resuelve las reglas nombradas en `[rules]` (`agent_step`, `model_step`, `post_init`)
+  buscándolas en `CustomEvolutionRules`;
+- vuelca `[properties]` como propiedades globales del modelo;
+- siembra la población según `[population]` e `initialization_rule`;
+- ejecuta el hook `post_init` si existe (p.ej. precomputar el kernel FFT de Lenia).
+
+Devuelve el modelo listo para avanzar con `step!`.
+"""
 function initialize_model(config::Dict)
     # Creating the space with SpaceDefinition module
     space = create_space(config)

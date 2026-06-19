@@ -272,6 +272,14 @@ function record_rgb_grid(model, viz_config)
     println("Guardado: $output")
 end
 
+"""
+    video_simulation(model, viz_config, space_config)
+
+Avanza el `model` paso a paso y graba un vídeo MP4 de la evolución según `[visualization]`
+(`filename`, `frames`, `framerate`, `color_scheme`, …). Elige el render adecuado al espacio:
+heatmap para grids con estado continuo (p.ej. Lenia), scatter para agentes discretos y un
+trazado especial para espacios hexagonales. Opcionalmente guarda fotos del paso 0 y final.
+"""
 function video_simulation(model, viz_config, space_config)
     if space_config["type"] == "hexagonal"
         record_hexagonal(model, viz_config)
@@ -314,7 +322,13 @@ function video_simulation(model, viz_config, space_config)
     )
 end
 
-# Guarda una foto del estado actual. output_path: ruta donde guardar la figura.
+"""
+    photo_simulation(model, viz_config, space_config, output_path=nothing)
+
+Guarda una foto (PNG) del estado actual del `model` en `output_path`, con el mismo criterio
+de render que [`video_simulation`](@ref) (heatmap para campos continuos, scatter para agentes).
+Útil para capturar el estado inicial o final sin grabar todo el vídeo.
+"""
 function photo_simulation(model, viz_config, space_config,
                           output_path::Union{String, Nothing}=nothing)
     color_scheme = get(viz_config, "color_scheme", nothing)
@@ -406,6 +420,14 @@ function _resolve_metric(key)
     return sym
 end
 
+"""
+    run_simulation(model, run_config, viz_config, space_config)
+
+Ejecuta la simulación con `run!` recogiendo datos a lo largo del tiempo y los escribe a CSV.
+Lee de `[run]` el número de `steps`, la ruta `output` y las métricas `mdata`/`adata`; estas
+pueden nombrar **propiedades** del modelo o **funciones agregadoras** definidas en
+`CustomEvolutionRules` (p.ej. `total_energy`). Opcionalmente guarda fotos del paso 0 y final.
+"""
 function run_simulation(model, run_config, viz_config, space_config)
     steps      = get(run_config, "steps",        100)
     output     = get(run_config, "output",        "output_data/results.csv")

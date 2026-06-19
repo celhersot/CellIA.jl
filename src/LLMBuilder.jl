@@ -490,6 +490,15 @@ end
 
 # --- Main entry point ---
 
+"""
+    build_from_prompt(user_text; interactive=true, output_dir=...) -> String
+
+Traduce una descripción en lenguaje natural (`user_text`) a una simulación de Cell_IA
+ejecutable, usando el LLM local. Enruta la petición a una categoría de modelo, genera el
+`.toml` (y, si hace falta, un `_rules.jl`), valida la salida con un bucle de reparación y la
+escribe en `output_dir`. Con `interactive=true` pide confirmación antes de generar.
+Devuelve la ruta `output_dir` con los archivos generados.
+"""
 function build_from_prompt(user_text::String;
                            interactive::Bool = true,
                            output_dir = joinpath(@__DIR__, "..", "examples"))

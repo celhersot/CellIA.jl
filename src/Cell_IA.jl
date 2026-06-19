@@ -16,5 +16,7 @@ using .Initialization
 using .LLMBuilder
 using .Representation
 
-export build_from_prompt, HexagonalGridSpace
+export build_from_prompt, HexagonalGridSpace,
+       initialize_model, create_space,
+       run_simulation, video_simulation, photo_simulation
 end
