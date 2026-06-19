@@ -15,9 +15,9 @@ makedocs(
         Cell_IA.HexagonalSpace,
     ],
     pages = [
-        "Inicio"            => "index.md",
-        "Guía de uso"       => "guia.md",
-        "Referencia de API" => "api.md",
+        "Home"          => "index.md",
+        "User guide"    => "guia.md",
+        "API reference" => "api.md",
     ],
     format = Documenter.HTML(
         prettyurls = get(ENV, "CI", "false") == "true",

@@ -1,37 +1,62 @@
-# Guía de uso
+# User guide
 
-## Inicio rápido
+## Quick start
 
-La forma más directa de ejecutar un modelo es el lanzador `examples/main.jl`, que lee un TOML
-y, opcionalmente, un archivo de reglas de usuario:
+The most direct way to run a model is the `examples/main.jl` launcher, which reads a TOML and,
+optionally, a user-provided rules file:
 
 ```bash
-# Solo configuración
+# Config only
 julia examples/main.jl examples/organismo.toml
 
-# Configuración + reglas de usuario (modelos que aportan su propio struct/funciones)
+# Config + user rules (models that ship their own struct/functions)
 julia examples/main.jl examples/lenia_perturbation.toml examples/lenia_perturbation.jl
 ```
 
-Programáticamente el flujo es: leer el TOML → [`initialize_model`](@ref) → pedir una salida
-([`video_simulation`](@ref), [`photo_simulation`](@ref) o [`run_simulation`](@ref)).
+Programmatically the flow is: read the TOML → [`initialize_model`](@ref) → request an output
+([`video_simulation`](@ref), [`photo_simulation`](@ref) or [`run_simulation`](@ref)).
 
-## Estructura de un TOML
+## Generating a model from a prompt (local LLM)
 
-Un modelo se describe con estas secciones (no todas son obligatorias):
+[`build_from_prompt`](@ref) turns a natural-language description into a runnable simulation. It
+routes the request into one of the four categories, generates the `.toml` (and a `_rules.jl`
+when needed), validates the output with a repair loop and runs it:
 
-| Sección | Para qué sirve |
+```julia
+using Cell_IA
+build_from_prompt("a colony of cells on a honeycomb grid")
+```
+
+The first call downloads a ~1 GB model into `models/` and runs it on CPU through
+`bin/llama-cli` (set `CELL_IA_GPU_LAYERS` to offload to a GPU). Generated files are written to
+`examples/` by default (`output_dir` keyword).
+
+## Where outputs are saved
+
+| Output | Function | Default location |
+|---|---|---|
+| Video (MP4) | [`video_simulation`](@ref) | `[visualization].filename`, e.g. `output_videos/<name>.mp4` |
+| Photos (PNG) | [`photo_simulation`](@ref) | `[visualization].photo_prefix`, default `output_photos/sim*` |
+| Metrics (CSV) | [`run_simulation`](@ref) | `[run].output`, default `output_data/results.csv` |
+
+The folders are created automatically and are git-ignored.
+
+## Anatomy of a TOML
+
+A model is described with these sections (not all are mandatory):
+
+| Section | Purpose |
 |---|---|
-| `[simulation]` | Nombre del modelo y `seed` (reproducibilidad). |
+| `[simulation]` | Model name and `seed` (reproducibility). |
 | `[space]` | `type` (`grid`/`continuous`/`hexagonal`), `dimensions`, `periodic`, `metric`. |
-| `[agents]` | `state_type` (`Bool`, `Int`, `Symbol`, `Float64` o un tipo propio de las reglas). |
-| `[population]` | `pop_density` o `pop_quantity` por estado: cuántos agentes y de qué tipo. |
-| `[properties]` | Parámetros globales del modelo (p.ej. `lenia_mu`, `min_to_live`…). |
-| `[rules]` | `initialization_rule`, `agent_step`, `model_step`, `post_init` (nombres de funciones en `CustomEvolutionRules`). |
-| `[visualization]` | Salida de vídeo/foto: `filename`, `frames`, `framerate`, `color_scheme`, `title`. |
-| `[run]` | Recogida de datos: `steps`, `output` (CSV) y `mdata`/`adata` (propiedades o funciones agregadoras). |
+| `[agents]` | `state_type` (`Bool`, `Int`, `Symbol`, `Float64` or a custom type from the rules). |
+| `[population]` | `pop_density` or `pop_quantity` per state: how many agents and of which type. |
+| `[properties]` | Global model parameters (e.g. `lenia_mu`, `min_to_live`…). |
+| `[rules]` | `initialization_rule`, `agent_step`, `model_step`, `post_init` (names of functions in `CustomEvolutionRules`). |
+| `[visualization]` | Video/photo output: `filename`, `frames`, `framerate`, `color_scheme`, `title`. |
+| `[run]` | Data collection: `steps`, `output` (CSV) and `mdata`/`adata` (properties or aggregator functions). |
 
-Ejemplo mínimo (Game of Life):
+Minimal example (Game of Life):
 
 ```toml
 [simulation]
@@ -64,28 +89,41 @@ frames = 100
 framerate = 10
 ```
 
-## Catálogo de modelos de ejemplo
+## The four simulation categories
 
-En `examples/` hay configuraciones listas para ejecutar:
+Every model falls into one of these four categories, which set the kind of space and rules:
 
-| Modelo | TOML | Tipo |
+| Category | What it is | Space |
 |---|---|---|
-| Game of Life | `conway.toml`, `gol.toml` | grid booleano |
-| Rock–Paper–Scissors | `rps.toml` | grid de símbolos |
-| Segregación de Schelling | `schelling.toml` | grid con movimiento |
-| Incendio forestal | `forestFire.toml` | grid |
-| Flocking / boids | `flocking.toml` | espacio continuo |
-| Lenia (orbium) | `lenia.toml`, `organismo.toml` | grid de campo continuo (FFT) |
-| Lenia bajo perturbación | `lenia_perturbation.toml` | + ruido estocástico y métricas de energía |
-| Image trace | `image_trace.toml`, `image_trace_pointillist.toml` | agentes que reproducen una imagen |
-| Otros | `isla.toml`, `hive.toml`, `particles.toml` | varios |
+| `grid_discrete` | Cellular automaton on a grid where each cell holds a **discrete** state and updates from its neighbours. Game-of-Life style. | `grid` |
+| `continuous_field` | **Lenia**-type: a grid of cells holding a **continuous** value in [0, 1] that form an organism flowing across the grid. | `grid` |
+| `continuous_space` | **Flocking/boids**: many agents move as points through a continuous space and group with their neighbours. | `continuous` |
+| `hexagonal` | Models on a **hexagonal** grid with per-cell properties. Hive style. | `hexagonal` |
 
-## Cómo añadir un modelo nuevo
+## Example catalogue
 
-1. **Estado del agente:** usa un tipo básico en `[agents].state_type` o define tu propio struct
-   en un archivo de reglas (como `Painter` en `examples/image_trace.jl`).
-2. **Reglas:** escribe la(s) función(es) de actualización (`agent_step!` y/o `model_step!`) y, si
-   necesitas preparación inicial, un `post_init`. Pueden ir en `CustomEvolutionRules` (genéricas)
-   o en un archivo de usuario que `main.jl` inyecta.
-3. **Configuración:** crea el `.toml` nombrando esas reglas en `[rules]`.
-4. **Ejecuta:** `julia examples/main.jl tu_modelo.toml [tus_reglas.jl]`.
+`examples/` ships ready-to-run configurations:
+
+| Model | TOML | Category / type |
+|---|---|---|
+| Game of Life | `conway.toml`, `gol.toml` | `grid_discrete` (boolean grid) |
+| Rock–Paper–Scissors | `rps.toml` | `grid_discrete` (symbol grid) |
+| Schelling segregation | `schelling.toml` | `grid_discrete` (grid with movement) |
+| Forest fire | `forestFire.toml` | `grid_discrete` |
+| Flocking / boids | `flocking.toml` + `flocking.jl` | `continuous_space` |
+| Particle attraction | `particles.toml` + `particles.jl` | `continuous_space` |
+| Lenia (orbium) | `lenia.toml`, `organismo.toml` | `continuous_field` (FFT field grid) |
+| Lenia under perturbation | `lenia_perturbation.toml` + `lenia_perturbation.jl` | `continuous_field` + stochastic noise & energy metrics |
+| Hive | `hive.toml` + `hive.jl` | `hexagonal` |
+| Image trace | `image_trace.toml`, `image_trace_pointillist.toml` + `image_trace.jl` | agents reproducing an image |
+| Others | `isla.toml` + `isla_rules.jl` | various |
+
+## How to add a new model
+
+1. **Agent state:** use a basic type in `[agents].state_type`, or define your own struct in a
+   rules file (like `Painter` in `examples/image_trace.jl`).
+2. **Rules:** write the update function(s) (`agent_step!` and/or `model_step!`) and, if you need
+   initial setup, a `post_init`. They can live in `CustomEvolutionRules` (generic) or in a user
+   file that `main.jl` injects.
+3. **Configuration:** create the `.toml` naming those rules under `[rules]`.
+4. **Run:** `julia examples/main.jl your_model.toml [your_rules.jl]`.

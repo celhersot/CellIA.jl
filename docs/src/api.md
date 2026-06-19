@@ -1,16 +1,16 @@
-# Referencia de API
+# API reference
 
-Documentación de las funciones públicas principales. La cobertura se irá ampliando módulo a
-módulo (hoy se documenta el flujo principal de construcción, ejecución y salida).
+Documentation of the main public functions. Coverage will grow module by module (today it
+documents the main build, run and output flow).
 
-## Construcción del modelo
+## Model construction
 
 ```@docs
 initialize_model
 create_space
 ```
 
-## Salida: vídeo, foto y datos
+## Output: video, photo and data
 
 ```@docs
 video_simulation
@@ -18,13 +18,13 @@ photo_simulation
 run_simulation
 ```
 
-## Diseño asistido por LLM
+## LLM-assisted design
 
 ```@docs
 build_from_prompt
 ```
 
-## Índice
+## Index
 
 ```@index
 ```

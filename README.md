@@ -10,6 +10,24 @@ configuration file, without modifying the source code. It builds the model with
 [Agents.jl](https://github.com/JuliaDynamics/Agents.jl) and renders the result as an
 MP4 video (or PNG photos / a CSV of metrics) with [CairoMakie.jl](https://github.com/MakieOrg/Makie.jl).
 
+<video src="https://github.com/celhersot/Cell_IA/raw/main/media/orbium.mp4" autoplay loop muted playsinline width="360"></video>
+
+*An orbium — a self-propelling Lenia creature — running in Cell_IA.*
+
+## Highlights
+
+- **Lenia, out of the box.** Cell_IA is, as far as we know, the **first agent-based framework
+  in Julia where you can both run *and* customize Lenia** (continuous cellular automata): seed
+  an orbium, tune the growth function μ/σ, add stochastic perturbations and measure the
+  organism's energy — all from a TOML.
+- **The first public hexagonal space for Agents.jl.** `HexagonalGridSpace`
+  ([src/spaces/HexagonalSpace.jl](src/spaces/HexagonalSpace.jl)) is a custom
+  `Agents.AbstractSpace`. This is the first publicly available hexagonal space built on
+  Agents.jl: **anyone using Agents.jl can run their own hexagonal simulations simply by copying
+  the abstract space definition.**
+
+<video src="https://github.com/celhersot/Cell_IA/raw/main/media/hexagonal_hive.mp4" autoplay loop muted playsinline width="360"></video>
+
 ## Installation
 
 Until the package is registered in the Julia General registry, install it from GitHub:
@@ -21,13 +39,29 @@ Pkg.add(url="https://github.com/celhersot/Cell_IA")
 
 ## Running a simulation
 
+There are three ways to run a simulation:
+
 ```bash
-# Config only (built-in rules)
+# 1. An existing example with just its TOML (built-in rules)
 julia examples/main.jl examples/gol.toml
 
-# Config + a custom rules file
-julia examples/main.jl examples/rps.toml examples/rules.jl
+# 2. An existing example with its TOML and its custom .jl rules
+julia examples/main.jl examples/flocking.toml examples/flocking.jl
 ```
+
+```julia
+# 3. Generating a simulation from a natural-language prompt (local LLM)
+using Cell_IA
+build_from_prompt("a flock of birds that group together as they move")
+```
+
+`build_from_prompt` routes the request to one of the four model categories, writes the `.toml`
+(and a `_rules.jl` if needed), validates it and runs it; the first call downloads a ~1 GB model
+into `models/` and runs on CPU via `bin/llama-cli`.
+
+<video src="https://github.com/celhersot/Cell_IA/raw/main/media/flocking.mp4" autoplay loop muted playsinline width="360"></video>
+
+*Flocking / boids in continuous space.*
 
 Outputs are written to `output_videos/` (and `output_photos/` / `output_data/` when a
 `[visualization]` photo or `[run]` block is configured).
