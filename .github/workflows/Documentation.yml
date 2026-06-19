@@ -1,0 +1,33 @@
+name: Documentation
+on:
+  push:
+    branches:
+      - main
+    tags: ['*']
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+jobs:
+  build:
+    name: Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      actions: write    # julia-actions/cache puede borrar cachés antiguas
+      contents: write   # deploydocs publica en la rama gh-pages (vía GITHUB_TOKEN)
+      statuses: write   # enlaces de previsualización en PRs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v2
+      - name: Instalar dependencias de los docs
+        run: julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+      - name: Construir y desplegar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
+        run: julia --project=docs docs/make.jl
