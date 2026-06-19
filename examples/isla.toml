@@ -1,0 +1,25 @@
+[simulation]
+model_name = "Isla"
+seed = 42
+[space]
+type = "grid"
+dimensions = [50, 50]
+periodic = true
+metric = "chebyshev"
+[agents]
+state_type = "Symbol"
+[population]
+pop_density = { "tree" = 0.25, "water" = 0.5, "empty" = 0.25 }
+[rules]
+agent_step = "isla_step!"
+model_step = "default_model_step!"
+initialization_rule = "random"
+[visualization]
+filename = "output_videos/isla.mp4"
+title = "Isla"
+variable_to_color = "state"
+color_scheme = { tree = "darkgreen", water = "blue", empty = "beige", ash = "gray" }
+agent_shape = "rect"
+agent_size = 10
+framerate = 10
+frames = 120

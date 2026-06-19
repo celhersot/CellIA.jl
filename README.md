@@ -1,116 +1,101 @@
-# 🦠 Cell_IA 1.0🦠
-### *A Data-Driven Multi-Agent Systems Framework in Julia*
+# Cell_IA
 
-![Julia](https://img.shields.io/badge/language-Julia-9558b2?style=for-the-badge&logo=julia)
-![Status](https://img.shields.io/badge/status-active-success?style=for-the-badge)
-![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)
+*A data-driven Agent-Based Modelling (ABM) framework in Julia.*
 
-Welcome to Cell_IA, a modular and highly customizable environment for simulating Agent-Based Models (ABM). This framework allows you to switch between different agent types, space sizes and properties, and evolution rules simply by editing a TOML configuration file without touching the core logic.
+[![CI](https://github.com/celhersot/Cell_IA.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/celhersot/Cell_IA.jl/actions/workflows/CI.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
----
+Cell_IA lets you define and run agent-based simulations entirely from a TOML
+configuration file, without modifying the source code. It builds the model with
+[Agents.jl](https://github.com/JuliaDynamics/Agents.jl) and renders the result as an
+MP4 video (or PNG photos / a CSV of metrics) with [CairoMakie.jl](https://github.com/MakieOrg/Makie.jl).
 
-## 🧬 Core Architecture
+## Installation
 
-The framework is organized into **4 specialized modules**:
+Until the package is registered in the Julia General registry, install it from GitHub:
 
-1.  **`AgentDefinition`**: 
-    * Defines agent data structures (`structs`).
-    * Supports only one type called `UniversalAgent` (for discrete logic).
-2.  **`EvolutionRules`**:
-    * Contains the behavioral logic.
-    * Handles **Synchronous** (buffered) and **Asynchronous** evolution.
-3.  **`Initialization`**:
-    * Sets up the environment (Grids only).
-    * Populates the world using strategies like `random_placement`, `sorted_h`, or `sorted_v`.
-4.  **`Representation`**:
-    * Handles data visualization and video export (`.mp4`).
-    * Supports dynamic shapes (Rectangles, Circles, etc) and complex color mappings.
+```julia
+using Pkg
+Pkg.add(url="https://github.com/celhersot/Cell_IA.jl")
+```
 
----
+## Running a simulation
 
-## ⚙️ Configuration (TOML)
+```bash
+# Config only (built-in rules)
+julia examples/main.jl examples/gol.toml
 
-Everything is **Data-Driven**. The framework reads a `.toml` file to decide how to build and run the simulation.
+# Config + a custom rules file
+julia examples/main.jl examples/rps.toml examples/rules.jl
+```
 
-### Example Configuration:
+Outputs are written to `output_videos/` (and `output_photos/` / `output_data/` when a
+`[visualization]` photo or `[run]` block is configured).
+
+### Example models
+
+| Config | Rules file | Description |
+|--------|-----------|-------------|
+| `gol.toml` | built-in | Conway's Game of Life |
+| `rps.toml` | built-in | Rock–Paper–Scissors |
+| `schelling.toml` | built-in | Schelling segregation |
+| `conway.toml` | `conway_rules.jl` | Game of Life variant |
+| `forestFire.toml` | `rules.jl` | Forest fire with struct states |
+| `isla.toml` | `isla_rules.jl` | Tree/water spread |
+| `flocking.toml` | `flocking.jl` | Boids in continuous space |
+| `particles.toml` | `particles.jl` | Particle attraction (continuous) |
+| `hive.toml` | `hive.jl` | Bees on a hexagonal grid |
+| `lenia.toml` | built-in | Lenia continuous cellular automaton |
+| `lenia_perturbation.toml` | `lenia_perturbation.jl` | Lenia under stochastic noise |
+| `organismo.toml` | built-in | Lenia "orbium" creature |
+| `image_trace.toml` | `image_trace.jl` | Colour agents that reproduce an image |
+| `image_trace_pointillist.toml` | `image_trace.jl` | Pointillist variant over the target image |
+
+## Architecture
+
+The package (`src/Cell_IA.jl`) is split into modules:
+
+| Module | Role |
+|--------|------|
+| `UniversalAgents` | Generic `UniversalAgent{T}` agent (`T` = `Bool`, `Int`, `Float64`, `Symbol`, or a custom struct) |
+| `SpaceDefinition` | Builds the space (`grid`, `continuous`, `hexagonal`) from the config |
+| `HexagonalSpace` | Hexagonal grid space implementation |
+| `CustomEvolutionRules` | Built-in rules (Game of Life, RPS, Schelling, Lenia…) and lattice metrics |
+| `Initialization` | Reads the config, resolves types and rule names, builds the model and populates it |
+| `Representation` | Video, photo and CSV export |
+| `LLMBuilder` | Experimental local-LLM generator of simulations (optional) |
+
+## Configuration (TOML)
+
 ```toml
-[simulation]
-model_name = "RockPaperScissors"
-seed = 42
-steps = 200
-
-[space]
-type = "grid"
-dimensions = [50, 50]
-periodic = true
-metric = "chebyshev"
-
-[agents]
-n_states = 3
-type = "GridAgent"
-density = 1.0
-
-[rules]
-agent_step = "rps_step_syn!" 
-model_step = "gol_model_step!"
-initialization_rule = "random_placement"
-
-[properties]
-threshold = 3
-
-[visualization]
-filename = "rps_simulation.mp4"
-title = "Rock Paper Scissors"
-agent_shape = "rect"
-agent_size = 13
-framerate = 15
-frames = 50
-color_scheme = { 1 = "red", 2 = "green", 3 = "blue" } 
-variable_to_color = "state"´
-```
----
-
-## 🎮 How to Run
-To run the framework, use the main.jl script and pass the path to your desired .toml configuration as an argument.
-
-Available Examples:
-Navigate to your project root and execute:
-
-### 1. Game of Life - Synchronous
-julia examples/main.jl examples/gol_syn.toml
-
-### 2. Game of Life - Asynchronous
-julia examples/main.jl examples/gol_asyn.toml
-
-### 3. Rock-Paper-Scissors
-julia examples/main.jl examples/rps_syn.toml
-
----
-
-## 📂 Project Structure
-```plaintext
-.
-├── src/
-│   ├── AgentDefinition.jl          # Agent structs
-│   ├── EvolutionRulesDefinition.jl # Logic and Physics
-│   ├── InitializationDefinition.jl # Space and Population setup
-│   └── RepresentationDefinition.jl # Makie Visualization
-├── examples/
-│   ├── main.jl                     # Entry point
-│   ├── gol_syn.toml                # GoL config (Synchronous)
-│   ├── gol_asyn.toml               # GoL config (Asynchronous)
-│   └── rps_syn.toml                # Rock-Paper-Scissors config (Synchronous)
-└── README.md
+[simulation]    # model_name, seed
+[space]         # type ("grid"/"continuous"/"hexagonal"), dimensions, periodic, metric
+[agents]        # state_type, initial state fields
+[population]    # pop_density or pop_quantity (per state)
+[properties]    # model-level parameters (thresholds, rates, Lenia μ/σ…)
+[rules]         # agent_step, model_step, initialization_rule, post_init (function names)
+[visualization] # filename, framerate, frames, color_scheme, agent_shape…
+[run]           # optional: steps, output CSV, adata/mdata metrics
 ```
 
----
+`color_scheme` accepts a named colormap (`"viridis"`), a per-state `Dict`, or `"rgb"`
+(each agent paints its own cell with an RGB carried in its state).
 
-## 🛠️ Customization
+## Adding a new model
 
-* To add a new rule: Define a function in EvolutionRulesDefinition.jl and reference its name in the agent_step field of your TOML.
+1. Write a TOML config in `examples/`.
+2. If the built-in rules are not enough, write a `.jl` file with the rule functions
+   (`rule!(agent, model)` / `rule!(model)`) and any custom state struct.
+3. Reference function and type names as strings in the TOML.
+4. Run it with `julia examples/main.jl examples/yourmodel.toml examples/yourrules.jl`.
 
-* To change visuals: Edit the color_scheme or agent_shape in the TOML.
+## Tests
 
----
+```julia
+using Pkg
+Pkg.test("Cell_IA")
+```
 
-Developed by Celia with ❤️ using Agents.jl and CairoMakie.jl.
+## License
+
+MIT — see [LICENSE](LICENSE).

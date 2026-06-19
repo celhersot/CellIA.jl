@@ -2,40 +2,71 @@ import Pkg
 
 using TOML
 
-include("../src/InitializationDefinition.jl")
-include("../src/RepresentationDefinition.jl")
+include("../src/spaces/HexagonalSpace.jl")
+include("../src/UniversalAgents.jl")
+include("../src/CustomEvolutionRules.jl")
+include("../src/SpaceDefinition.jl")
+include("../src/Initialization.jl")
+include("../src/Representation.jl")
 
-using .InitializationDefinition
-using .RepresentationDefinition
+using .Initialization
+using .Representation
 
-function main(config_file::String="gol_syn.toml")
-    # Is conif_file existing?
-    if !isfile(config_file)
-        error("The configuration file '$config_file' does not exist.")
+# Carga un archivo de reglas de usuario dentro de CustomEvolutionRules.
+function load_user_rules(rules_file::String)
+    if !isfile(rules_file)
+        error("Archivo de reglas no encontrado: $rules_file")
     end
+    println("Cargando reglas de usuario: $rules_file")
+    Base.include(Main.CustomEvolutionRules, abspath(rules_file))
+end
 
-    println("--> Extracting the configuration from: $config_file")
+function main(config_file::String, rules_file::Union{String, Nothing}=nothing)
+    # 1. Configuration
+    if !isfile(config_file)
+        error("Config file not found: $config_file")
+    end
     config = TOML.parsefile(config_file)
 
-    sim_name = get(config["simulation"], "model_name", "Unknown Simulation")
-    println("--> Detected model: $sim_name")
+    # 2. Rules
+    if !isnothing(rules_file) && isfile(rules_file)
+        load_user_rules(rules_file)
+    else
+        println("Sin archivo de reglas; uso las predefinidas.")
+    end
 
-    println("--> Initializing model and agentes...")
-    model = initialize_model(config)
+    Base.invokelatest(_execute, config)
+    println("Listo.")
+end
 
-    println("--> Starting simulation and generating video...")
-    viz_config = config["visualization"]
-    
-    video_simulation(model, viz_config)
+function _execute(config)
+    name = config["simulation"]["model_name"]
+    viz      = get(config, "visualization", nothing)
+    run_conf = get(config, "run", nothing)
 
-    println("--> Finished! Simulation saved in: $(viz_config["filename"])")
+    # Cada salida usa su propio modelo recien inicializado (run! y video son independientes).
+    if !isnothing(run_conf)
+        println("Inicializando $name (run)...")
+        model = initialize_model(config)
+        run_simulation(model, run_conf,
+                       isnothing(viz) ? Dict{String,Any}() : viz,
+                       config["space"])
+    end
+
+    if !isnothing(viz) && haskey(viz, "filename")
+        println("Inicializando $name (video)...")
+        model = initialize_model(config)
+        println("Generando video...")
+        video_simulation(model, viz, config["space"])
+    end
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    # It allows exectue from cmd: julia main.jl config_file.toml
-    if length(ARGS) > 0
-        main(ARGS[1])
+    if length(ARGS) == 1
+        main(ARGS[1])                # Only config.toml
+    elseif length(ARGS) >= 2
+        main(ARGS[1], ARGS[2])       # Also rules.jl
     else
-        main() # Uses "gol_syn.toml" by default
+        println("Use: julia main.jl <config.toml> [rules.jl]")
     end
 end

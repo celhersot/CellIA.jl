@@ -1,0 +1,25 @@
+[simulation]
+model_name = "Conway's Game of Life"
+seed = 42
+[space]
+type = "grid"
+dimensions = [100, 100]
+periodic = true
+metric = "chebyshev"
+[agents]
+state_type = "Bool"
+[population]
+pop_density = { true = 0.3, false = 0.7 }
+[rules]
+agent_step = "gol_step!"
+model_step = "default_model_step!"
+initialization_rule = "random"
+[visualization]
+filename = "output_videos/conway.mp4"
+title = "Conway's Game of Life"
+variable_to_color = "state"
+color_scheme = { true = "black", false = "white" }
+agent_shape = "rect"
+agent_size = 3
+framerate = 10
+frames = 150

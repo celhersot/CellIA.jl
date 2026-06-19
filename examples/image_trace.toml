@@ -1,0 +1,39 @@
+# Reproduce una imagen con agentes camaleon: migran hacia su color y, al asentarse,
+# copian el color exacto de la imagen.
+#   julia examples/main.jl examples/image_trace.toml examples/image_trace.jl
+
+[simulation]
+model_name = "ImageTrace"
+seed = 42
+
+[space]
+type = "grid"
+dimensions = [96, 96]      # lienzo de menor resolucion que la imagen
+periodic = false
+metric = "chebyshev"
+
+[agents]
+state_type = "Painter"
+
+[properties]
+image_path     = "examples/tulipanes.jpg"   # PNG/JPG; vacio = patron de demo
+density        = 0.7       # fraccion de celdas con agente
+search_radius  = 8         # radio de busqueda de color
+chameleon      = true      # copiar el color exacto al asentarse
+chameleon_rate = 0.15      # velocidad de la transformacion (0..1)
+arrival_tol    = 0.12      # distancia de color para asentarse
+patience       = 3         # pasos bloqueado antes de asentarse
+
+[rules]
+initialization_rule = "empty"
+post_init           = "trace_init!"
+model_step          = "trace_model_step!"
+
+[visualization]
+filename               = "output_videos/image_trace.mp4"
+title                  = "Calcando la imagen (camaleon)"
+color_scheme           = "rgb"
+background_color       = "black"
+show_target_background = false
+framerate              = 20
+frames                 = 220
