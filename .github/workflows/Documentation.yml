@@ -19,7 +19,7 @@ jobs:
       contents: write   # deploydocs publica en la rama gh-pages (vía GITHUB_TOKEN)
       statuses: write   # enlaces de previsualización en PRs
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1'
