@@ -1,7 +1,7 @@
 name = "Cell_IA"
 uuid = "466ded5e-d711-40d1-bdce-35a3fe75cb17"
-authors = ["Celia Hermoso Soto <celhersot@gmail.com> and contributors"]
 version = "0.1.0"
+authors = ["Celia Hermoso Soto <celhersot@gmail.com> and contributors"]
 
 [deps]
 Agents = "46ada45e-f475-11e8-01d0-f70cc89e6671"
@@ -29,7 +29,7 @@ FileIO = "1.17.0"
 ImageIO = "0.6.9"
 JSON = "0.21.4"
 LinearAlgebra = "1"
-Makie = "0.22.10"
+Makie = "0.22.10, 0.24"
 Random = "1"
 TOML = "1"
 julia = "1.10"
