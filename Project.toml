@@ -1,7 +1,7 @@
 name = "Cell_IA"
 uuid = "466ded5e-d711-40d1-bdce-35a3fe75cb17"
-authors = ["Celia Hermoso Soto <celhersot@gmail.com> and contributors"]
 version = "0.2.0"
+authors = ["Celia Hermoso Soto <celhersot@gmail.com> and contributors"]
 
 [deps]
 Agents = "46ada45e-f475-11e8-01d0-f70cc89e6671"
@@ -20,7 +20,7 @@ TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 
 [compat]
 Agents = "6.2.10"
-CairoMakie = "0.13.10"
+CairoMakie = "0.13.10, 0.15"
 ColorTypes = "0.12.1"
 Distributions = "=0.25.000"
 Downloads = "1"
