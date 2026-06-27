@@ -311,6 +311,9 @@ function video_simulation(model, viz_config, space_config)
         shape = _build_agent_shape_fn(viz_config)
     end
 
+    out_dir = dirname(viz_config["filename"])
+    !isempty(out_dir) && mkpath(out_dir)
+
     abmvideo(
         viz_config["filename"], model;
         agent_color  = color,

@@ -1,11 +1,11 @@
-# Cell_IA
+# CellIA
 
 *A data-driven Agent-Based Modelling (ABM) framework in Julia.*
 
-[![CI](https://github.com/celhersot/Cell_IA.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/celhersot/Cell_IA.jl/actions/workflows/CI.yml)
+[![CI](https://github.com/celhersot/CellIA.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/celhersot/CellIA.jl/actions/workflows/CI.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Cell_IA lets you define and run agent-based simulations entirely from a TOML
+CellIA lets you define and run agent-based simulations entirely from a TOML
 configuration file, without modifying the source code. It builds the model with
 [Agents.jl](https://github.com/JuliaDynamics/Agents.jl) and renders the result as an
 MP4 video (or PNG photos / a CSV of metrics) with [CairoMakie.jl](https://github.com/MakieOrg/Makie.jl).
@@ -16,7 +16,7 @@ Until the package is registered in the Julia General registry, install it from G
 
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/celhersot/Cell_IA.jl")
+Pkg.add(url="https://github.com/celhersot/CellIA.jl")
 ```
 
 ## Running a simulation
@@ -53,7 +53,7 @@ Outputs are written to `output_videos/` (and `output_photos/` / `output_data/` w
 
 ## Architecture
 
-The package (`src/Cell_IA.jl`) is split into modules:
+The package (`src/CellIA.jl`) is split into modules:
 
 | Module | Role |
 |--------|------|
@@ -93,7 +93,7 @@ The package (`src/Cell_IA.jl`) is split into modules:
 
 ```julia
 using Pkg
-Pkg.test("Cell_IA")
+Pkg.test("CellIA")
 ```
 
 ## License

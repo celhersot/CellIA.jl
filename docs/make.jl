@@ -1,18 +1,18 @@
 using Documenter
-using Cell_IA
+using CellIA
 
 makedocs(
-    sitename = "Cell_IA.jl",
+    sitename = "CellIA.jl",
     authors  = "Celia Hermoso Soto",
     modules  = [
-        Cell_IA,
-        Cell_IA.Initialization,
-        Cell_IA.SpaceDefinition,
-        Cell_IA.Representation,
-        Cell_IA.CustomEvolutionRules,
-        Cell_IA.LLMBuilder,
-        Cell_IA.UniversalAgents,
-        Cell_IA.HexagonalSpace,
+        CellIA,
+        CellIA.Initialization,
+        CellIA.SpaceDefinition,
+        CellIA.Representation,
+        CellIA.CustomEvolutionRules,
+        CellIA.LLMBuilder,
+        CellIA.UniversalAgents,
+        CellIA.HexagonalSpace,
     ],
     pages = [
         "Inicio"            => "index.md",
@@ -21,14 +21,12 @@ makedocs(
     ],
     format = Documenter.HTML(
         prettyurls = get(ENV, "CI", "false") == "true",
-        canonical  = "https://celhersot.github.io/Cell_IA.jl",
+        canonical  = "https://celhersot.github.io/CellIA.jl",
     ),
-    # De momento avisamos (no fallamos) ante docstrings/refs pendientes; se irá endureciendo
-    # a medida que se complete la documentación de la API.
     warnonly = true,
 )
 
 deploydocs(
-    repo      = "github.com/celhersot/Cell_IA.jl",
+    repo      = "github.com/celhersot/CellIA.jl",
     devbranch = "main",
 )

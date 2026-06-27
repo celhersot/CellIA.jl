@@ -1,8 +1,8 @@
-# Cell\_IA.jl
+# CellIA.jl
 
 *Framework de simulación de autómatas y modelos basados en agentes (ABM) configurables por TOML.*
 
-Cell\_IA es un framework escrito en Julia, construido sobre
+CellIA es un framework escrito en Julia, construido sobre
 [Agents.jl](https://github.com/JuliaDynamics/Agents.jl), cuyo objetivo es **definir y
 ejecutar simulaciones sin escribir código**: el usuario describe el modelo en un archivo
 `.toml` (espacio, agentes, población, reglas, visualización) y el framework lo construye,
@@ -23,13 +23,13 @@ lo ejecuta y genera la salida (vídeo MP4, fotos PNG o datos CSV).
 
 ```julia
 using Pkg
-Pkg.add(url = "https://github.com/celhersot/Cell_IA.jl")
+Pkg.add(url = "https://github.com/celhersot/CellIA.jl")
 ```
 
 ## Un vistazo rápido
 
 ```julia
-using Cell_IA, TOML
+using CellIA, TOML
 
 config = TOML.parsefile("examples/organismo.toml")  # describe el modelo
 model  = initialize_model(config)                    # construye y puebla el mundo

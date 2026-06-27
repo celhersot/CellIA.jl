@@ -1,4 +1,4 @@
-module Cell_IA
+module CellIA
 
 include("spaces/HexagonalSpace.jl")
 include("UniversalAgents.jl")

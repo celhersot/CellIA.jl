@@ -20,7 +20,7 @@ function field(m)
     return A
 end
 
-@testset "Cell_IA" begin
+@testset "CellIA" begin
 
     @testset "create_space" begin
         grid = create_space(Dict("space" => Dict("type" => "grid", "dimensions" => [10, 10])))

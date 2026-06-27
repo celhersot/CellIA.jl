@@ -130,16 +130,20 @@ function _cli_completion(prompt::String; grammar, n_predict, timeout_s::Int = 30
     model_path   = ensure_model_exists()
     exe_name     = Sys.iswindows() ? "llama-cli.exe" : "llama-cli"
     llama_exe    = abspath(joinpath(@__DIR__, "..", "bin", exe_name))
-    prompt_file  = abspath(joinpath(@__DIR__, "llm_input.txt"))
-    grammar_file = abspath(joinpath(@__DIR__, "grammar.gbnf"))
-    out_file     = abspath(joinpath(@__DIR__, "llm_output.txt"))
-    stdin_file   = abspath(joinpath(@__DIR__, "llm_stdin.txt"))
+    # Ficheros de E/S ÚNICOS por llamada (en el tempdir del SO). Antes eran rutas fijas en
+    # src/, lo que hacía que dos generaciones a la vez —o una interrumpida con Ctrl+C que
+    # dejaba ficheros bloqueados— chocaran con EACCES (permission denied).
+    base         = tempname()
+    prompt_file  = base * "_input.txt"
+    grammar_file = base * "_grammar.gbnf"
+    out_file     = base * "_output.txt"
+    stdin_file   = base * "_stdin.txt"
+    proc = nothing
     try
         write(prompt_file, prompt)
         # Conversation mode reads the next user turn from stdin after generating; feeding
         # "/exit" makes llama quit cleanly (exit 0) on its own; no hang, nothing to kill.
         write(stdin_file, "/exit\n")
-        isfile(out_file) && rm(out_file; force = true)
         cmd = `$llama_exe --model $(abspath(model_path)) -f $prompt_file --n-gpu-layers $GPU_LAYERS --ctx-size 8192 --n-predict $n_predict --temp 0.2 --no-display-prompt`
         if grammar !== nothing
             write(grammar_file, grammar)
@@ -157,6 +161,12 @@ function _cli_completion(prompt::String; grammar, n_predict, timeout_s::Int = 30
         @error "Ejecución del modelo falló: $e"
         return ""
     finally
+        # Mata al hijo llama-cli si sigue vivo (p.ej. tras un Ctrl+C en mitad de la
+        # generación) para no dejar un proceso huérfano agarrando el modelo/los ficheros.
+        if proc !== nothing
+            try; process_running(proc) && kill(proc); catch; end
+            try; wait(proc); catch; end
+        end
         for f in (prompt_file, grammar_file, out_file, stdin_file)
             try; isfile(f) && rm(f; force = true); catch; end
         end
@@ -382,15 +392,36 @@ function validate_files(files::Dict, category::String)
         haskey(pop, "pop_quantity") ||
             return (false, "continuous_space requiere population.pop_quantity.")
 
-        # Cada campo `const` del struct @agent se instancia leyéndolo de [agents] por nombre
-        # (ver populate_continuous_world!). id/pos/vel los inyecta @agent automáticamente.
-        # Comprobamos la correspondencia aquí para que el bucle de reparación reciba un
-        # mensaje preciso en vez de fallar solo en ejecución.
-        struct_fields = [m.captures[1] for m in eachmatch(r"const\s+(\w+)\s*::", jl_str)]
+        # Campos declarados en el struct @agent (id/pos/vel los inyecta @agent automáticamente).
+        # Aislamos el cuerpo del struct para no confundir anotaciones de tipo de otras partes
+        # (p.ej. firmas de función) con campos.
+        struct_block = match(r"@agent\s+struct\s+\w+\s*\([^)]*\)(.*?)\bend\b"s, jl_str)
+        struct_body  = struct_block === nothing ? "" : struct_block.captures[1]
+        struct_fields = [m.captures[1] for m in eachmatch(r"(?:const\s+)?(\w+)\s*::", struct_body)]
+        declared = Set{String}(struct_fields); push!(declared, "id", "pos", "vel")
+
+        # Cada campo del struct @agent se instancia leyéndolo de [agents] por nombre
+        # (ver populate_continuous_world!). Comprobamos la correspondencia aquí para que el
+        # bucle de reparación reciba un mensaje preciso en vez de fallar solo en ejecución.
         missing_fields = [f for f in struct_fields if !haskey(agents, f)]
         isempty(missing_fields) ||
-            return (false, "Cada campo `const` del struct @agent debe tener un valor en [agents] del .toml. " *
+            return (false, "Cada campo del struct @agent debe tener un valor en [agents] del .toml. " *
                            "Faltan: $(join(missing_fields, ", ")). Añádelos bajo [agents] (NO declares id/pos/vel).")
+
+        # agent_step! NO puede leer campos que el struct no declara (p.ej. `bird.separation`
+        # cuando el struct solo tiene speed/visual_distance): compila pero peta en ejecución.
+        # Cazamos aquí los accesos `<agente>.campo` no declarados para que el LLM se autocorrija.
+        am = match(r"function\s+agent_step!\s*\(\s*(\w+)", jl_str)
+        if am !== nothing
+            avar = am.captures[1]
+            used = [m.captures[1] for m in eachmatch(Regex("\\b" * avar * "\\.(\\w+)"), jl_str)]
+            undeclared = unique(f for f in used if !(f in declared))
+            isempty(undeclared) ||
+                return (false, "agent_step! usa $(join(["$avar.$f" for f in undeclared], ", ")) " *
+                               "pero el struct @agent no declara $(length(undeclared) == 1 ? "ese campo" : "esos campos"). " *
+                               "Declara cada uno en el struct (p.ej. `const $(first(undeclared))::Float64`) " *
+                               "Y añade su valor en [agents] del .toml.")
+        end
 
     elseif category == "hexagonal"
         get(viz, "agent_shape", "") == "hexagon" ||
